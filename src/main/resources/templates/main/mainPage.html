@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>퀴즈 메인</title>
+  <link rel="stylesheet" href="MainStyle.css">
+</head>
+<body>
+<header>
+  <img class="logo" src="assets/logo.png" alt="로고" />
+  <div class="menu-buttons">
+    <button>공지사항</button>
+    <button>로그인</button>
+  </div>
+</header>
+
+<main>
+  <div class="quiz-container">
+
+    <!-- 카드 1 -->
+    <div class="quiz-card" onclick="location.href='/quiz/image-part'">
+      <div class="quiz-thumbnail">
+        <img src="assets/sample-thumbnail.jpg" alt="퀴즈 썸네일" />
+      </div>
+      <div class="quiz-info">
+        <div class="quiz-title">부분 이미지 퀴즈</div>
+        <div class="quiz-desc">
+          잘린 부분 사진 보고 맞추기<br />
+          퀴즈 설명 설명 설명어어엉
+        </div>
+        <img class="icon" src="assets/icon-image.png" alt="아이콘" />
+      </div>
+    </div>
+
+    <!-- 카드 2 -->
+    <div class="quiz-card" onclick="location.href='/quiz/image-full'">
+      <div class="quiz-thumbnail">
+        <img src="assets/sample-thumbnail.jpg" alt="퀴즈 썸네일" />
+      </div>
+      <div class="quiz-info">
+        <div class="quiz-title">전체 이미지 퀴즈</div>
+        <div class="quiz-desc">
+          전체 사진 보고 맞추기<br />
+          퀴즈 설명 설명 설명어어엉
+        </div>
+        <img class="icon" src="assets/icon-image.png" alt="아이콘" />
+      </div>
+    </div>
+
+    <!-- 카드 3 -->
+    <div class="quiz-card" onclick="location.href='/quiz/audio'">
+      <div class="quiz-thumbnail">
+        <img src="assets/sample-thumbnail.jpg" alt="퀴즈 썸네일" />
+      </div>
+      <div class="quiz-info">
+        <div class="quiz-title">음성 퀴즈</div>
+        <div class="quiz-desc">
+          음악 듣고 맞추기<br />
+          퀴즈 설명 설명 설명어어엉
+        </div>
+        <img class="icon" src="assets/icon-audio.png" alt="아이콘" />
+      </div>
+    </div>
+
+    <!-- 카드 4 -->
+    <div class="quiz-card" onclick="location.href='/quiz/multiple'">
+      <div class="quiz-thumbnail">
+        <img src="assets/sample-thumbnail.jpg" alt="퀴즈 썸네일" />
+      </div>
+      <div class="quiz-info">
+        <div class="quiz-title">객관식 퀴즈</div>
+        <div class="quiz-desc">
+          객관식 문제 보고 선택지 맞추기<br />
+          퀴즈 설명 설명 설명어어엉
+        </div>
+        <img class="icon" src="assets/icon-list.png" alt="아이콘" />
+      </div>
+    </div>
+
+    <!-- 카드 5 -->
+    <div class="quiz-card" onclick="location.href='/quiz/ai'">
+      <div class="quiz-thumbnail">
+        <img src="assets/sample-thumbnail.jpg" alt="퀴즈 썸네일" />
+      </div>
+      <div class="quiz-info">
+        <div class="quiz-title">객관식 퀴즈 (AI)</div>
+        <div class="quiz-desc">
+          AI가 만든 객관식 문제 보고 맞추기<br />
+          퀴즈 설명 설명 설명어어엉
+        </div>
+        <img class="icon" src="assets/icon-ai.png" alt="아이콘" />
+      </div>
+    </div>
+
+  </div>
+</main>
+</body>
+</html>

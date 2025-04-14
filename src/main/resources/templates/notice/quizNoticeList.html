@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>공지사항 목록</title>
+    <link rel="stylesheet" href="/css/MainStyle.css"/>
+    <script src="/js/jquery-3.6.0.min.js"></script>
+    <script>
+        function doDetail(seq) {
+            location.href = "/notice/noticeInfo?nSeq=" + seq;
+        }
+    </script>
+</head>
+<body>
+
+<header>
+    <img class="logo" src="/assets/logo.png" alt="로고" />
+    <div class="menu-buttons">
+        <button onclick="location.href='/notice/quizNoticeList'">공지사항</button>
+        <button onclick="location.href='/notice/quizNoticeReg'">글쓰기</button>
+    </div>
+</header>
+
+<main>
+    <div class="notice-container">
+        <h2 style="margin-bottom: 20px;">공지사항</h2>
+
+        <!-- 공지사항 반복 박스 -->
+        <div class="notice-item" th:each="dto : ${rList}" th:onclick="|doDetail(${dto.noticeSeq})|">
+            <span class="notice-title" th:text="${dto.title}">공지사항</span>
+            <span class="notice-date" th:text="${#strings.substring(dto.regDt, 2, 10)}"></span>
+        </div>
+
+        <!-- 글쓰기 버튼은 header로 올렸기 때문에 생략 가능 -->
+    </div>
+</main>
+
+</body>
+</html>

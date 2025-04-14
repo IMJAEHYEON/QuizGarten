@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>공지사항 등록하기</title>
+    <link rel="stylesheet" href="/css/MainStyle.css"/>
+    <script src="/js/jquery-3.6.0.min.js"></script>
+    <script>
+        $(document).ready(function () {
+            $("#btnSend").on("click", function () {
+                doSubmit();
+            });
+        });
+
+        function calculateBytes(str) {
+            return [...str].reduce((total, char) => {
+                const code = char.charCodeAt(0);
+                return total + (code > 127 ? (code > 2047 ? 3 : 2) : 1);
+            }, 0);
+        }
+
+        function doSubmit() {
+            const f = document.getElementById("f");
+
+            if (f.title.value === "") {
+                alert("제목을 입력하세요.");
+                f.title.focus();
+                return;
+            }
+            if (calculateBytes(f.title.value) > 200) {
+                alert("최대 200Bytes까지 입력 가능합니다.");
+                f.title.focus();
+                return;
+            }
+
+            const noticeChecked = Array.from(f.noticeYn).some(input => input.checked);
+            if (!noticeChecked) {
+                alert("공지글 여부를 선택해주세요.");
+                f.noticeYn[0].focus();
+                return;
+            }
+
+            if (f.contents.value === "") {
+                alert("내용을 입력하세요.");
+                f.contents.focus();
+                return;
+            }
+            if (calculateBytes(f.contents.value) > 4000) {
+                alert("최대 4000Bytes까지 입력 가능합니다.");
+                f.contents.focus();
+                return;
+            }
+
+            $.ajax({
+                url: "/notice/noticeInsert",
+                type: "post",
+                dataType: "json",
+                data: $("#f").serialize(),
+                success: function (json) {
+                    alert(json.msg);
+                    location.href = "/notice/quizNoticeList";
+                }
+            });
+        }
+    </script>
+</head>
+<body>
+
+<header>
+    <img class="logo" src="/assets/logo.png" alt="로고" />
+    <div class="menu-buttons">
+        <button onclick="location.href='/notice/quizNoticeList'">공지사항</button>
+        <button onclick="location.href='/user/login'">로그인</button>
+    </div>
+</header>
+
+<main>
+    <div class="notice-form-container">
+        <form name="f" id="f">
+            <input type="text" name="title" class="notice-input" placeholder="공지 제목 입력" maxlength="100"/>
+
+            <div class="notice-radio-group" style="margin-bottom: 20px;">
+                <label><input type="radio" name="noticeYn" value="Y"/> 공지</label>
+                <label style="margin-left: 20px;"><input type="radio" name="noticeYn" value="N"/> 일반</label>
+            </div>
+
+            <textarea name="contents" class="notice-textarea" placeholder="공지 내용을 입력하세요."></textarea>
+
+            <div class="notice-form-buttons">
+                <button id="btnSend" type="button">등록</button>
+                <button type="reset">다시 작성</button>
+            </div>
+        </form>
+    </div>
+</main>
+
+</body>
+</html>
