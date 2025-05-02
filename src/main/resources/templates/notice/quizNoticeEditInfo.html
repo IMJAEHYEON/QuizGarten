@@ -5,12 +5,20 @@
     <title>공지사항 수정하기</title>
     <link rel="stylesheet" href="/css/MainStyle.css"/>
     <script src="/js/jquery-3.6.0.min.js"></script>
-    <script>
+    <script th:inline="javascript">
         $(document).ready(function () {
             $("#btnSend").on("click", function () {
                 doSubmit();
             });
         });
+        function goMain() {
+            const sessionUserId = /*[[${SS_USER_ID}]]*/ null;
+            if (sessionUserId === null || sessionUserId === "") {
+                location.href = "/main/mainPage";
+            } else {
+                location.href = "/main/mainLoginSuccess";
+            }
+        }
 
         function calculateBytes(str) {
             return [...str].reduce((total, char) => {
@@ -58,18 +66,32 @@
                 data: $("#f").serialize(),
                 success: function (json) {
                     alert(json.msg);
-                    // location.href = "/notice/quizNoticeList"; // 필요 시 주석 해제
+                    location.href = "/notice/quizNoticeList";
                 }
+            });
+        }
+        function showAlert(message, callback) {
+            $("#alertMessage").html(message);
+
+            $("#customAlert")
+                .css("display", "flex")  // flex로 중앙 정렬
+                .hide()
+                .fadeIn(200, function () {
+                    $(this).addClass("show"); // ✅ 애니메이션 효과 주기 위해 .show 추가
+                });
+
+            $("#alertOk").off("click").on("click", function () {
+                $("#customAlert").removeClass("show").fadeOut(150);
+                if (typeof callback === "function") callback();
             });
         }
     </script>
 </head>
-
 <body>
 <header>
-    <img class="logo" src="/assets/logo.png" alt="로고" />
+    <img class="logo" src="/assets/logo/logo.png" alt="로고" onclick="goMain()" style="cursor:pointer;" />
     <div class="menu-buttons">
-        <button onclick="location.href='/notice/list'">공지사항</button>
+        <button onclick="location.href='/notice/quizNoticeList'">공지사항</button>
         <button onclick="location.href='/user/logout'">로그아웃</button>
     </div>
 </header>
@@ -87,8 +109,8 @@
                 <label style="margin-left: 20px;"><input type="radio" name="noticeYn" value="N" th:checked="${rDTO.noticeYn eq 'N'}"/> 일반</label>
             </div>
 
-            <textarea name="contents" class="notice-textarea"
-                      placeholder="공지 내용을 입력하세요.">${rDTO.contents}</textarea>
+            <textarea name="contents" class="notice-textarea" placeholder="공지 내용을 입력하세요."
+                      th:text="${rDTO.contents}"></textarea>
 
             <div class="notice-form-buttons">
                 <button id="btnSend" type="button">수정</button>
@@ -97,5 +119,12 @@
         </form>
     </div>
 </main>
+<!-- 공통 알림창 -->
+<div id="customAlert">
+    <div class="alert-box">
+        <div id="alertMessage">알림 메시지</div>
+        <button id="alertOk">확인</button>
+    </div>
+</div>
 </body>
 </html>

@@ -19,15 +19,15 @@ import java.io.Serializable;
 public class UserInfoEntity implements Serializable {
 
     @Id
-    @Column(name = "user_id")
+    @Column(name = "user_id", length = 100)
     private String userId;
 
     @NonNull
-    @Column(name = "user_name", length = 500, nullable = false)
+    @Column(name = "user_name", nullable = false)
     private String userName;
 
     @NonNull
-    @Column(name = "password", length = 1, nullable = false)
+    @Column(name = "password", nullable = false)
     private String password;
 
     @NonNull
@@ -55,5 +55,13 @@ public class UserInfoEntity implements Serializable {
 
     @Column(name = "roles") //권한 데이터는 ,를 구분자로 여러 개(예 : 관리자, 일반사용자) 정의 가능함
     private String roles;
+    /**
+     * 비밀번호 변경 메서드
+     * @param newPassword 암호화된 새 비밀번호
+     */
+
+    public void changePassword(String newPassword) {
+        this.password = newPassword;
+    }
 
 }

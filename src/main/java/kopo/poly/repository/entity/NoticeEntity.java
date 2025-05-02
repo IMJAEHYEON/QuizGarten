@@ -23,19 +23,18 @@ public class NoticeEntity {
     private Long noticeSeq;
 
     @NonNull
-    @Column(name = "title", length = 500, nullable = false)
+    @Column(name = "title", nullable = false)
     private String title;
 
     @NonNull
-    @Column(name = "notice_yn", length = 1, nullable = false)
+    @Column(name = "notice_yn", nullable = false)
     private String noticeYn;
 
     @NonNull
     @Column(name = "contents", nullable = false)
     private String contents;
 
-    @NonNull
-    @Column(name = "user_id", nullable = false)
+    @Column(name = "user_id", nullable = false, length = 100)
     private String userId;
 
     @Column(name = "read_cnt", nullable = false)

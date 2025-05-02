@@ -8,14 +8,10 @@ import kopo.poly.service.INoticeService;
 import kopo.poly.util.CmmUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseBody;
-
-import java.util.*;
+import org.springframework.web.bind.annotation.*;
 import java.util.Optional;
 
 
@@ -41,34 +37,36 @@ public class NoticeController {
      * <p>
      * GetMapping(value = "notice/noticeList") =>  GET방식을 통해 접속되는 URL이 notice/noticeList 경우 아래 함수를 실행함
      */
-    @GetMapping(value = "noticeList")
-    public String noticeList(HttpSession session, ModelMap model)
-            throws Exception {
+    @GetMapping(value = "quizNoticeList")
+    public String quizNoticeList(HttpSession session,
+                                 ModelMap model,
+                                 @RequestParam(value = "page", defaultValue = "0") int page,
+                                 @RequestParam(value = "size", defaultValue = "10") int size) throws Exception {
 
-        // 로그 찍기(추후 찍은 로그를 통해 이 함수에 접근했는지 파악하기 용이하다.)
-        log.info("{}.noticeList Start!", this.getClass().getName());
+        log.info("{}.quizNoticeList Start!", this.getClass().getName());
 
-        // 로그인된 사용자 아이디는 Session에 저장함
-        // 교육용으로 아직 로그인을 구현하지 않았기 때문에 Session에 데이터를 저장하지 않았음
-        // 추후 로그인을 구현할 것으로 가정하고, 공지사항 리스트 출력하는 함수에서 로그인 한 것처럼 Session 값을 생성함
-        session.setAttribute("SESSION_USER_ID", "USER01");
+        String sessionUserId = (String) session.getAttribute("SS_USER_ID");
 
-        // 공지사항 리스트 조회하기
-        // Java 8부터 제공되는 Optional 활용하여 NPE(Null Pointer Exception) 처리
-        List<NoticeDTO> rList = Optional.ofNullable(noticeService.getNoticeList())
-                .orElseGet(ArrayList::new);
+        if (sessionUserId != null && !sessionUserId.isEmpty()) {
+            log.info("로그인된 사용자 ID : {}", sessionUserId);
+            model.addAttribute("SS_USER_ID", sessionUserId);
+        } else {
+            log.info("비로그인 사용자입니다.");
+        }
+        model.addAttribute("SS_USER_ID", sessionUserId);
 
-        // 조회된 리스트 결과값 넣어주기
-        model.addAttribute("rList", rList);
+        // 페이징 적용된 리스트 조회
+        Page<NoticeDTO> noticePage = noticeService.getNoticeList(page, size);
 
-        // 로그 찍기(추후 찍은 로그를 통해 이 함수 호출이 끝났는지 파악하기 용이하다.)
-        log.info("{}.noticeList End!", this.getClass().getName());
+        model.addAttribute("noticePage", noticePage); // 페이징된 리스트
+        model.addAttribute("currentPage", page);
+        model.addAttribute("totalPages", noticePage.getTotalPages());
 
-        // 함수 처리가 끝나고 보여줄 HTML (Thymeleaf) 파일명
-        // templates/notice/noticeList.html
-        return "notice/noticeList";
+        log.info("{}.quizNoticeList End!", this.getClass().getName());
 
+        return "notice/quizNoticeList"; // Thymeleaf 템플릿
     }
+
 
     /**
      * 게시판 작성 페이지 이동
@@ -77,16 +75,28 @@ public class NoticeController {
      * <p>
      * GetMapping(value = "notice/noticeReg") =>  GET방식을 통해 접속되는 URL이 notice/noticeReg 경우 아래 함수를 실행함
      */
-    @GetMapping(value = "noticeReg")
-    public String noticeReg() {
+    @GetMapping(value = "quizNoticeReg")
+    public String quizNoticeReg(HttpSession session, ModelMap model) {
 
-        log.info("{}.noticeReg Start!", this.getClass().getName());
+        log.info("{}.quizNoticeReg Start!", this.getClass().getName());
 
-        log.info("{}.noticeReg End!", this.getClass().getName());
+        String sessionUserId = (String) session.getAttribute("SS_USER_ID");
+
+        if (sessionUserId == null || sessionUserId.isEmpty()) {
+            log.info("비로그인 사용자 접근 - 메인 페이지로 리디렉션");
+            return "redirect:/main/mainPage"; // 또는 redirect:/login
+        }
+
+        // 로그인된 사용자 ID Thymeleaf로 전달
+        model.addAttribute("SS_USER_ID", sessionUserId);
+
+        log.info("{}.quizNoticeReg End!", this.getClass().getName());
+
+        log.info("{}.quizNoticeReg End!", this.getClass().getName());
 
         // 함수 처리가 끝나고 보여줄 HTML (Thymeleaf) 파일명
-        // templates/notice/noticeReg.html
-        return "notice/noticeReg";
+        // templates/notice/quizNoticeReg.html
+        return "notice/quizNoticeReg";
     }
 
     /**
@@ -96,10 +106,10 @@ public class NoticeController {
      * JSON 구조로 결과 메시지를 전송하기 위해 @ResponseBody 어노테이션 추가함
      */
     @ResponseBody
-    @PostMapping(value = "noticeInsert")
-    public MsgDTO noticeInsert(HttpServletRequest request, HttpSession session) {
+    @PostMapping(value = "quizNoticeInsert")
+    public MsgDTO quizNoticeInsert(HttpServletRequest request, HttpSession session) {
 
-        log.info("{}.noticeInsert Start!", this.getClass().getName());
+        log.info("{}.quizNoticeInsert Start!", this.getClass().getName());
 
         String msg = ""; // 메시지 내용
 
@@ -107,8 +117,7 @@ public class NoticeController {
 
         try {
             // 로그인된 사용자 아이디를 가져오기
-            // 로그인을 아직 구현하지 않았기에 공지사항 리스트에서 로그인 한 것처럼 Session 값을 저장함
-            String userId = CmmUtil.nvl((String) session.getAttribute("SESSION_USER_ID"));
+            String userId = CmmUtil.nvl((String) session.getAttribute("SS_USER_ID"));
             String title = CmmUtil.nvl(request.getParameter("title")); // 제목
             String noticeYn = CmmUtil.nvl(request.getParameter("noticeYn")); // 공지글 여부
             String contents = CmmUtil.nvl(request.getParameter("contents")); // 내용
@@ -145,7 +154,7 @@ public class NoticeController {
             // 결과 메시지 전달하기
             dto = MsgDTO.builder().msg(msg).build();
 
-            log.info("{}.noticeInsert End!", this.getClass().getName());
+            log.info("{}.quizNoticeInsert End!", this.getClass().getName());
         }
 
         return dto;
@@ -154,48 +163,39 @@ public class NoticeController {
     /**
      * 게시판 상세보기
      */
-    @GetMapping(value = "noticeInfo")
-    public String noticeInfo(HttpServletRequest request, ModelMap model) throws Exception {
+    @GetMapping(value = "quizNoticeInfo")
+    public String quizNoticeInfo(HttpServletRequest request, ModelMap model) throws Exception {
 
-        log.info("{}.noticeInfo Start!", this.getClass().getName());
+        log.info("{}.quizNoticeInfo Start!", this.getClass().getName());
 
-        String nSeq = CmmUtil.nvl(request.getParameter("nSeq"), "0"); // 공지글번호(PK)
+        String nSeq = CmmUtil.nvl(request.getParameter("nSeq"), "0");
 
-        /*
-         * ####################################################################################
-         * 반드시, 값을 받았으면, 꼭 로그를 찍어서 값이 제대로 들어오는지 파악해야함 반드시 작성할 것
-         * ####################################################################################
-         */
         log.info("nSeq : {}", nSeq);
 
-        /*
-         * 값 전달은 반드시 DTO 객체를 이용해서 처리함 전달 받은 값을 DTO 객체에 넣는다.
-         */
         NoticeDTO pDTO = NoticeDTO.builder().noticeSeq(Long.parseLong(nSeq)).build();
 
-        // 공지사항 상세정보 가져오기
-        // Java 8부터 제공되는 Optional 활용하여 NPE(Null Pointer Exception) 처리
+        // 조회수 증가 포함한 상세 정보 가져오기
         NoticeDTO rDTO = Optional.ofNullable(noticeService.getNoticeInfo(pDTO, true))
                 .orElseGet(() -> NoticeDTO.builder().build());
 
-        // 조회된 리스트 결과값 넣어주기
         model.addAttribute("rDTO", rDTO);
-
 
         log.info("{}.noticeInfo End!", this.getClass().getName());
 
-        return "notice/noticeInfo";
+        return "notice/quizNoticeInfo";
     }
+
 
     /**
      * 게시판 수정 보기
      */
-    @GetMapping(value = "noticeEditInfo")
-    public String noticeEditInfo(HttpServletRequest request, ModelMap model) throws Exception {
+    @GetMapping(value = "quizNoticeEditInfo")
+    public String quizNoticeEditInfo(HttpServletRequest request,HttpSession session, ModelMap model) throws Exception {
 
-        log.info("{}.noticeEditInfo Start!", this.getClass().getName());
+        log.info("{}.quizNoticeEditInfo Start!", this.getClass().getName());
 
         String nSeq = CmmUtil.nvl(request.getParameter("nSeq")); // 공지글번호(PK)
+        String sessionUserId = CmmUtil.nvl((String) session.getAttribute("SS_USER_ID"));
 
         /*
          * ####################################################################################
@@ -213,12 +213,13 @@ public class NoticeController {
         NoticeDTO rDTO = Optional.ofNullable(noticeService.getNoticeInfo(pDTO, false))
                 .orElseGet(() -> NoticeDTO.builder().build());
 
+        model.addAttribute("SS_USER_ID", sessionUserId);
         // 조회된 리스트 결과값 넣어주기
         model.addAttribute("rDTO", rDTO);
 
-        log.info("{}.noticeEditInfo End!", this.getClass().getName());
+        log.info("{}.quizNoticeEditInfo End!", this.getClass().getName());
 
-        return "notice/noticeEditInfo";
+        return "notice/quizNoticeEditInfo";
     }
 
     /**
@@ -226,15 +227,15 @@ public class NoticeController {
      */
     @ResponseBody
     @PostMapping(value = "noticeUpdate")
-    public MsgDTO noticeUpdate(HttpSession session, HttpServletRequest request) {
+    public MsgDTO quizNoticeUpdate(HttpSession session, HttpServletRequest request) {
 
-        log.info("{}.noticeUpdate Start!", this.getClass().getName());
+        log.info("{}.quizNoticeUpdate Start!", this.getClass().getName());
 
         String msg = ""; // 메시지 내용
         MsgDTO dto; // 결과 메시지 구조
 
         try {
-            String userId = CmmUtil.nvl((String) session.getAttribute("SESSION_USER_ID")); // 아이디
+            String userId = CmmUtil.nvl((String) session.getAttribute("SS_USER_ID")); // 아이디
             String nSeq = CmmUtil.nvl(request.getParameter("nSeq")); // 글번호(PK)
             String title = CmmUtil.nvl(request.getParameter("title")); // 제목
             String noticeYn = CmmUtil.nvl(request.getParameter("noticeYn")); // 공지글 여부
@@ -271,7 +272,7 @@ public class NoticeController {
             // 결과 메시지 전달하기
             dto = MsgDTO.builder().msg(msg).build();
 
-            log.info("{}.noticeUpdate End!", this.getClass().getName());
+            log.info("{}.quizNoticeUpdate End!", this.getClass().getName());
 
         }
 
@@ -283,9 +284,9 @@ public class NoticeController {
      */
     @ResponseBody
     @PostMapping(value = "noticeDelete")
-    public MsgDTO noticeDelete(HttpServletRequest request) {
+    public MsgDTO quizNoticeDelete(HttpServletRequest request) {
 
-        log.info("{}.noticeDelete Start!", this.getClass().getName());
+        log.info("{}.quizNoticeDelete Start!", this.getClass().getName());
 
         String msg = ""; // 메시지 내용
         MsgDTO dto; // 결과 메시지 구조
@@ -319,7 +320,7 @@ public class NoticeController {
             // 결과 메시지 전달하기
             dto = MsgDTO.builder().msg(msg).build();
 
-            log.info("{}.noticeDelete End!", this.getClass().getName());
+            log.info("{}.quizNoticeDelete End!", this.getClass().getName());
 
         }
 

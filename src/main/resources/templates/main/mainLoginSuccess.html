@@ -1,98 +1,149 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8" />
     <title>퀴즈 메인 - 로그인 후</title>
-    <link rel="stylesheet" href="MainStyle.css" />
+    <link rel="stylesheet" href="/css/MainStyle.css" />
+    <script src="/js/jquery-3.6.0.min.js"></script>
+    <script th:inline="javascript">
+        $(document).ready(function () {
+
+            // 사용자 이름 불러오기
+            $.ajax({
+                url: "/user/getUserInfo",
+                type: "post",
+                dataType: "json",
+                success: function (res) {
+                    $("#userWelcome").html(res.userName + " 님, 환영합니다!");
+                }
+            });
+
+            $("#btnMyPage").on("click", function () {
+                location.href = "/mypage/myPage";
+            });
+
+
+            $("#btnLogout").on("click", function () {
+                $.post("/user/logout", function (res) {
+                    showAlert(res.msg, function () {
+                        location.href = "/main/mainPage";
+                    });
+                });
+            });
+
+            $("#btnDeleteUser").on("click", function () {
+                const password = prompt("탈퇴를 원하시면 비밀번호를 입력해주세요:");
+
+                if (!password) {
+                    showAlert("비밀번호를 입력하셔야 탈퇴가 가능합니다.");
+                    return;
+                }
+
+                if (!confirm("정말로 탈퇴하시겠습니까? 탈퇴 후 계정은 복구되지 않습니다.")) {
+                    return;
+                }
+
+                $.ajax({
+                    url: "/user/deleteUserSecure",
+                    type: "post",
+                    data: { password: password },
+                    dataType: "JSON",
+                    success: function (json) {
+                        showAlert(json.msg, function () {
+                            if (json.result === 1) {
+                                location.href = "/main/mainPage";
+                            }
+                        });
+                    },
+                    error: function () {
+                        showAlert("회원 탈퇴 중 오류가 발생했습니다.");
+                    }
+                });
+            });
+            $("#btnChangePassword").on("click", function () {
+                $.ajax({
+                    url: "/user/changePasswordCheck",
+                    type: "get",
+                    dataType: "json",
+                    success: function (res) {
+                        if (res.result === 1) {
+                            location.href = "/user/changePassword";
+                        } else {
+                            showAlert(res.msg);
+                        }
+                    },
+                    error: function () {
+                        showAlert("세션 확인 중 오류가 발생했습니다.");
+                    }
+                });
+            });
+
+
+            // ✅ 알림 팝업 함수는 document.ready 바깥에서 정의
+            function showAlert(message, callback) {
+                $("#alertMessage").html(message);
+
+                $("#customAlert")
+                    .css("display", "flex")
+                    .hide()
+                    .fadeIn(200, function () {
+                        $(this).addClass("show");
+                    });
+
+                $("#alertOk").off("click").on("click", function () {
+                    $("#customAlert").removeClass("show").fadeOut(150);
+                    if (typeof callback === "function") callback();
+                });
+            }
+        });
+        function goMain() {
+            const sessionUserId = /*[[${SS_USER_ID}]]*/ null;
+            if (sessionUserId === null || sessionUserId === "") {
+                location.href = "/main/mainPage";
+            } else {
+                location.href = "/main/mainLoginSuccess";
+            }
+        }
+    </script>
 </head>
 <body>
 <header>
-    <img class="logo" src="assets/logo.png" alt="로고" />
+    <img class="logo" src="/assets/logo/logo.png" alt="로고" onclick="goMain()" style="cursor:pointer;" />
     <div class="menu-buttons">
-        <button onclick="location.href='/user/delete'">회원탈퇴</button>
-        <button onclick="location.href='/notice/list'">공지사항</button>
-        <button onclick="location.href='/user/logout'">로그아웃</button>
-        <button onclick="location.href='/user/mypage'">마이페이지</button>
+        <span id="userWelcome">로그인 중...</span>
+        <button id="btnMyPage">마이페이지</button>
+        <button id="btnLogout">로그아웃</button>
+        <button id="btnDeleteUser">회원탈퇴</button>
+        <button id="btnChangePassword">비밀번호 변경</button>
+        <button onclick="location.href='/notice/quizNoticeList'">공지사항</button>
     </div>
 </header>
 
 <main>
     <div class="quiz-container">
         <!-- 카드 1 -->
-        <div class="quiz-card" onclick="location.href='/quiz/image-part'">
+        <div class="quiz-card" onclick="location.href='/quiz/image'">
             <div class="quiz-thumbnail">
-                <img src="assets/sample-thumbnail.jpg" alt="퀴즈 썸네일" />
+                <img src="/assets/thumbnail/sample_thumbnail.jpg" alt="썸네일" />
             </div>
             <div class="quiz-info">
                 <div class="quiz-title">부분 이미지 퀴즈</div>
-                <div class="quiz-desc">
-                    잘린 부분 사진 보고 맞추기<br />
-                    퀴즈 설명 설명 설명어어엉
+                <div>
+                    <div class="quiz-desc">부분 사진 보고 맞추기<br/>퀴즈 설명 설명 설명어어엉
+                    </div>
+                    <img class="icon" src="/assets/icon/image_icon.png" alt="아이콘" />
                 </div>
-                <img class="icon" src="assets/icon-image.png" alt="아이콘" />
             </div>
         </div>
+    </div>
 
-        <!-- 카드 2 -->
-        <div class="quiz-card" onclick="location.href='/quiz/image-full'">
-            <div class="quiz-thumbnail">
-                <img src="assets/sample-thumbnail.jpg" alt="퀴즈 썸네일" />
-            </div>
-            <div class="quiz-info">
-                <div class="quiz-title">전체 이미지 퀴즈</div>
-                <div class="quiz-desc">
-                    전체 사진 보고 맞추기<br />
-                    퀴즈 설명 설명 설명어어엉
-                </div>
-                <img class="icon" src="assets/icon-image.png" alt="아이콘" />
-            </div>
-        </div>
-
-        <!-- 카드 3 -->
-        <div class="quiz-card" onclick="location.href='/quiz/audio'">
-            <div class="quiz-thumbnail">
-                <img src="assets/sample-thumbnail.jpg" alt="퀴즈 썸네일" />
-            </div>
-            <div class="quiz-info">
-                <div class="quiz-title">음성 퀴즈</div>
-                <div class="quiz-desc">
-                    음악 듣고 맞추기<br />
-                    퀴즈 설명 설명 설명어어엉
-                </div>
-                <img class="icon" src="assets/icon-audio.png" alt="아이콘" />
-            </div>
-        </div>
-
-        <!-- 카드 4 -->
-        <div class="quiz-card" onclick="location.href='/quiz/multiple'">
-            <div class="quiz-thumbnail">
-                <img src="assets/sample-thumbnail.jpg" alt="퀴즈 썸네일" />
-            </div>
-            <div class="quiz-info">
-                <div class="quiz-title">객관식 퀴즈</div>
-                <div class="quiz-desc">
-                    객관식 문제 보고 선택지 맞추기<br />
-                    퀴즈 설명 설명 설명어어엉
-                </div>
-                <img class="icon" src="assets/icon-list.png" alt="아이콘" />
-            </div>
-        </div>
-
-        <!-- 카드 5 -->
-        <div class="quiz-card" onclick="location.href='/quiz/ai'">
-            <div class="quiz-thumbnail">
-                <img src="assets/sample-thumbnail.jpg" alt="퀴즈 썸네일" />
-            </div>
-            <div class="quiz-info">
-                <div class="quiz-title">객관식 퀴즈 (AI)</div>
-                <div class="quiz-desc">
-                    AI가 만든 객관식 문제 보고 맞추기<br />
-                    퀴즈 설명 설명 설명어어엉
-                </div>
-                <img class="icon" src="assets/icon-ai.png" alt="아이콘" />
-            </div>
+    <div id="customAlert">
+        <div class="alert-box">
+            <div id="alertMessage">알림 메시지</div>
+            <button id="alertOk">확인</button>
         </div>
     </div>
 </main>
 </body>
 </html>
+

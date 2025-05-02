@@ -44,4 +44,5 @@ public class CommonResponse<T> {
                         HttpStatus.BAD_REQUEST.series().name(),
                         bindingResult.getAllErrors()));
     }
+
 }

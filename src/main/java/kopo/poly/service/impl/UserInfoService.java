@@ -7,6 +7,7 @@ import kopo.poly.repository.entity.UserInfoEntity;
 import kopo.poly.service.IUserInfoService;
 import kopo.poly.util.CmmUtil;
 import kopo.poly.util.DateUtil;
+import kopo.poly.util.EncryptUtil;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -40,6 +41,38 @@ public class UserInfoService implements IUserInfoService {
 
         log.info("{}.getUserIdExists End!", this.getClass().getName());
         return rDTO;
+    }
+
+    @Override
+    public UserInfoDTO getEmailExists(UserInfoDTO pDTO) throws Exception {
+        log.info("{}.getEmailExists Start!", this.getClass().getName());
+
+        // 이메일을 암호화해서 조회해야 함
+        String email = EncryptUtil.encAES128CBC(CmmUtil.nvl(pDTO.email()));
+
+        Optional<UserInfoEntity> rEntity = userInfoRepository.findByEmail(email);
+
+        UserInfoDTO rDTO = rEntity.map(entity -> UserInfoDTO.builder()
+                .existsYn("Y")
+                .build()).orElseGet(() -> UserInfoDTO.builder()
+                .existsYn("N")
+                .build());
+
+        log.info("{}.getEmailExists End!", this.getClass().getName());
+        return rDTO;
+    }
+
+    @Override
+    public UserInfoDTO getUserNameExists(UserInfoDTO pDTO) throws Exception {
+        log.info("getUserNameExists Start!");
+
+        String userName = CmmUtil.nvl(pDTO.userName());
+
+        boolean exists = userInfoRepository.findByUserName(userName).isPresent();
+
+        return UserInfoDTO.builder()
+                .existsYn(exists ? "Y" : "N")
+                .build();
     }
 
 
@@ -107,16 +140,85 @@ public class UserInfoService implements IUserInfoService {
         log.info("{}.getUserLoginCheck Start!", this.getClass().getName());
 
         String userId = CmmUtil.nvl(pDTO.userId()); // 아이디
-        String password = CmmUtil.nvl(pDTO.password()); // 비밀번호
+        String inputPassword = CmmUtil.nvl(pDTO.password());
 
-        log.info("userId : {}, password : {}", userId, password);
+        log.info("userId : {}, 해시된 입력 비밀번호 : {}", userId, inputPassword);
 
-        // 로그인을 위해 아이디와 비밀번호가 일치하는지 확인하기 위한 JPA 호출하기
-        boolean res = userInfoRepository.findByUserIdAndPassword(userId, password).isPresent();
+        Optional<UserInfoEntity> rEntity = userInfoRepository.findByUserId(userId);
+
+        if (rEntity.isPresent()) {
+            String storedPassword = rEntity.get().getPassword(); // DB 비밀번호 SHA-256 저장된 값
+            log.info("DB 저장된 password : {}", storedPassword);
+
+            if (storedPassword.equals(inputPassword)) {
+                log.info("비밀번호 일치!");
+                return 1; // 로그인 성공
+            } else {
+                log.warn("비밀번호 불일치!");
+            }
+        } else {
+            log.warn("아이디 없음!");
+        }
 
         log.info("{}.getUserLoginCheck End!", this.getClass().getName());
-
-        // 로그인 성공 : 1, 실패 : 0
-        return res ? 1 : 0;
+        return 0; // 로그인 실패
     }
+
+
+    @Override
+    public int deleteUser(String userId) throws Exception {
+
+        log.info("{}.deleteUser Start!", this.getClass().getName());
+
+        int res = 0;
+
+        Optional<UserInfoEntity> rEntity = userInfoRepository.findByUserId(userId);
+
+        if (rEntity.isPresent()) {
+            userInfoRepository.delete(rEntity.get()); //하드 삭제 (DB 에서 완전 삭제)
+            res = 1;
+        }
+
+        log.info("{}.deleteUser End!", this.getClass().getName());
+
+        return res;
+    }
+
+    /**
+     * 비밀번호 재변경 메일을 보내기 위한 메일 존재 여부 체크
+     *
+     *
+     */
+    @Override
+    public boolean existsByEmail(String email) throws Exception {
+        log.info("existsByEmail Start!");
+
+        String checkedEmail = CmmUtil.nvl(email); // null 방지
+        boolean exists = userInfoRepository.findByEmail(checkedEmail).isPresent();
+
+        log.info("existsByEmail End! exists = {}", exists);
+        return exists;
+    }
+
+    @Override
+    public UserInfoDTO getUserInfo(UserInfoDTO pDTO) throws Exception {
+        log.info("getUserInfo Start!");
+
+        String userId = CmmUtil.nvl(pDTO.userId());
+
+        Optional<UserInfoEntity> rEntity = userInfoRepository.findByUserId(userId);
+
+        UserInfoDTO rDTO = rEntity.map(entity -> UserInfoDTO.builder()
+                .userId(entity.getUserId())
+                .userName(entity.getUserName())
+                .email(entity.getEmail())
+                .addr1(entity.getAddr1())
+                .addr2(entity.getAddr2())
+                .build()).orElseGet(() -> UserInfoDTO.builder().build());
+
+        log.info("getUserInfo End!");
+
+        return rDTO;
+    }
+
 }

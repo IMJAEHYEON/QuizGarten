@@ -96,6 +96,32 @@ header {
     width: 30px;
     height: 30px;
 }
+
+/* 아이콘을 텍스트위치에 배치할 때 사용 */
+.quiz-desc {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85em;
+    color: #333;
+}
+
+.icon-left {
+    width: 24px;
+    height: 24px;
+}
+
+.icon-right {
+    width: 24px;
+    height: 24px;
+}
+
+.quiz-desc-text {
+    font-size: 0.85em;
+    color: #333;
+}
+
+
 /* 공지사항 게시판 CSS */
 .notice-container {
     display: flex;
@@ -205,5 +231,230 @@ header {
     margin: 0 10px;
     border-radius: 5px;
 }
+/* 페이징 버튼 스타일 */
+.pagination {
+    margin-top: 20px;
+    text-align: center;
+}
+
+.pagination a {
+    margin: 0 5px;
+    text-decoration: none;
+    color: blue;
+    cursor: pointer;
+}
+
+.pagination span {
+    margin: 0 5px;
+}
+
+/* 경고창 스타일 */
+/* 전체 팝업 배경 */
+#customAlert {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0,0,0,0.4);
+    display: none; /* 초기에 안 보이도록 */
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+}
+
+/* 팝업 박스 */
+.alert-box {
+    background-color: #fff;
+    padding: 30px 40px;
+    border-radius: 10px;
+    text-align: center;
+    font-size: 1rem;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    opacity: 0;
+    transform: scale(0.95);
+    transition: all 0.3s ease;
+    max-width: 90vw;
+}
+
+/* 팝업 나타나는 애니메이션 */
+#customAlert.show .alert-box {
+    opacity: 1;
+    transform: scale(1);
+}
 
 
+
+.alert-box button {
+    margin-top: 20px;
+    padding: 10px 20px;
+    background-color: #48aa78;
+    color: white;
+    font-weight: bold;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.alert-box button:hover {
+    background-color: #37986c;
+}
+
+
+/* 회원가입 페이지 공통 */
+.register-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: #98c89a;
+    height: 100vh;
+}
+
+.register-form {
+    background-color: #eef0d4;
+    padding: 40px;
+    border-radius: 10px;
+    width: 350px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+}
+
+.register-logo {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.register-logo img {
+    width: 50px;
+    height: 50px;
+}
+
+.register-title {
+    text-align: left;
+    margin-bottom: 20px;
+}
+
+.register-label {
+    font-weight: bold;
+    color: #4CAF50;
+    display: block;
+    margin-top: 10px;
+    margin-bottom: 5px;
+}
+
+.register-input {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 10px;
+    border: none;
+    border-radius: 5px;
+    background-color: white;
+}
+
+.register-id-group {
+    display: flex;
+    gap: 10px;
+}
+
+.register-btn-small {
+    padding: 10px;
+    background-color: #c8e6a2;
+    border: none;
+    border-radius: 5px;
+    font-weight: bold;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.register-btn-submit {
+    width: 100%;
+    padding: 12px;
+    margin-top: 20px;
+    background-color: #8bc34a;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.register-footer {
+    margin-top: 20px;
+    font-size: 0.85em;
+    text-align: center;
+}
+.login-container {
+    background-color: #98c89a;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* 로그인 스타일 */
+.login-box {
+    background-color: #eef0d4;
+    padding: 40px;
+    border-radius: 10px;
+    width: 350px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.login-logo {
+    height: 60px;
+    margin-bottom: 20px;
+}
+
+.login-box h2 {
+    margin-bottom: 20px;
+    font-size: 1.8rem;
+    color: #222;
+}
+
+.login-label {
+    align-self: flex-start;
+    margin: 10px 0 5px;
+    font-size: 0.95rem;
+    color: #37986c;
+    font-weight: bold;
+}
+
+.login-input {
+    width: 100%;
+    padding: 10px 15px;
+    border: none;
+    border-radius: 6px;
+    background-color: white;
+    margin-bottom: 10px;
+    font-size: 1rem;
+}
+
+.login-button {
+    width: 100%;
+    padding: 12px;
+    background-color: #7dbf69;
+    color: white;
+    font-weight: bold;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-top: 10px;
+}
+
+.login-button:hover {
+    background-color: #68aa58;
+}
+
+.login-footer {
+    font-size: 0.85rem;
+    margin-top: 15px;
+    color: #333;
+    text-align: center;
+}
+
+.login-footer a {
+    color: #2d7043;
+    text-decoration: none;
+    margin-left: 5px;
+}

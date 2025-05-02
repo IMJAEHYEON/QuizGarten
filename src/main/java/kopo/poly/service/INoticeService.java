@@ -2,15 +2,14 @@ package kopo.poly.service;
 
 
 import kopo.poly.dto.NoticeDTO;
-
-import java.util.List;
+import org.springframework.data.domain.Page;
 
 public interface INoticeService {
 
     /**
      * 공지사항 전체 가져오기
      */
-    List<NoticeDTO> getNoticeList();
+    Page<NoticeDTO> getNoticeList(int page, int size);
 
     /**
      * 공지사항 상세 정보가져오기

@@ -20,14 +20,22 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
-                                "/signup", "/login", "/user/duplicate-check",
+                                "/signup", "/login", "/logout", "/user/duplicate-check",
                                 "/find-password", "/reset-password/**",
-                                "/css/**", "/js/**", "/images/**"
+
+                                "/css/**", "/js/**", "/images/**",
+                                "/user/**", // user 하위 전체 허용
+                                "/notice/**", // notice 하위 전체 허용
+                                "/main/**", // main 하위 전체 허용
+                                "/mypage/**", // mypage 하위 전체 허용
+                                "/assets/**", // assets 하위 전체 허용
+                                "/css/**", // css 하위 전체 허용
+                                "/js/**" // js 하위 전체 허용
                         ).permitAll()
-                        .anyRequest().authenticated()
+                        .anyRequest().authenticated() // 그 외 요청은 인증 필요
                 )
                 .formLogin(form -> form
-                        .loginPage("/login")
+                        .loginPage("/user/login")
                         .defaultSuccessUrl("/main", true)
                         .failureUrl("/login?error")
                         .permitAll()

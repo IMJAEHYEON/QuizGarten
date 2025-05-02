@@ -14,6 +14,28 @@ public interface IUserInfoService {
     UserInfoDTO getUserIdExists(UserInfoDTO pDTO) throws Exception;
 
     /**
+     * 이메일 중복 체크
+     *
+     * @param pDTO 회원 가입을 위한 이메일
+     * @return 이메일 중복 여부 결과
+     */
+
+    UserInfoDTO getEmailExists(UserInfoDTO pDTO) throws Exception;
+
+
+    /**
+     * 유저닉네임 중복 체크
+     *
+     * @param pDTO 회원 가입을 위한 유저닉네임
+     * @return 유저닉네임 중복 여부 결과
+     */
+    UserInfoDTO getUserNameExists(UserInfoDTO pDTO) throws Exception;
+
+
+
+    UserInfoDTO getUserInfo(UserInfoDTO pDTO) throws Exception;
+
+    /**
      * 회원 가입하기(회원정보 등록하기)
      *
      * @param pDTO 회원 가입을 위한 회원정보
@@ -29,4 +51,21 @@ public interface IUserInfoService {
      */
     int getUserLogin(UserInfoDTO pDTO) throws Exception;
 
+
+    /**
+     * 회원 탈퇴 (비밀번호 확인 후 진행)
+     *
+     * @param userId 탈퇴 대상 아이디
+     * @return 성공 1 / 실패 0
+     */
+    int deleteUser(String userId) throws Exception;
+
+    /**
+     *
+     * 이메일 존재 여부 확인
+     *
+     * @param email
+     * @return
+     */
+    boolean existsByEmail(String email) throws Exception;
 }

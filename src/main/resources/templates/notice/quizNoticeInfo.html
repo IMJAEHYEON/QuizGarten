@@ -6,9 +6,9 @@
     <link rel="stylesheet" href="/css/MainStyle.css"/>
     <script src="/js/jquery-3.6.0.min.js"></script>
     <script th:inline="javascript">
-        const session_user_id = [[${session.SESSION_USER_ID}]];
-        const user_id = [[${rDTO.userId}]];
-        const nSeq = [[${rDTO.noticeSeq}]];
+        const session_user_id = [[${SS_USER_ID}]];  // 세션에서 로그인된 ID
+        const user_id = [[${rDTO.userId}]]                 // 게시글 작성자 ID
+        const nSeq = [[${rDTO.noticeSeq}]]
 
         $(document).ready(function () {
             $("#btnEdit").on("click", function () {
@@ -20,17 +20,26 @@
             });
 
             $("#btnList").on("click", function () {
-                location.href = "/notice/list";
+                location.href = "/notice/quizNoticeList";
             });
         });
 
+        function goMain() {
+            const sessionUserId = /*[[${SS_USER_ID}]]*/ null;
+            if (sessionUserId === null || sessionUserId === "") {
+                location.href = "/main/mainPage";
+            } else {
+                location.href = "/main/mainLoginSuccess";
+            }
+        }
+
         function doEdit() {
             if (session_user_id === user_id) {
-                location.href = "/notice/noticeEditInfo?nSeq=" + nSeq;
-            } else if (session_user_id === "") {
-                alert("로그인 하시길 바랍니다.");
+                location.href = "/notice/quizNoticeEditInfo?nSeq=" + nSeq;
+            } else if (!session_user_id) {
+                showAlert("로그인 후 수정할 수 있습니다.");
             } else {
-                alert("본인이 작성한 글만 수정 가능합니다.");
+                showAlert("본인이 작성한 글만 수정할 수 있습니다.");
             }
         }
 
@@ -43,39 +52,58 @@
                         dataType: "json",
                         data: { "nSeq": nSeq },
                         success: function (json) {
-                            alert(json.msg);
-                            location.href = "/notice/list";
+                            showAlert(json.msg, function () {
+                                location.href = "/notice/quizNoticeList";
+                            });
                         }
                     });
                 }
-            } else if (session_user_id === "") {
-                alert("로그인 하시길 바랍니다.");
+            } else if (!session_user_id) {
+                showAlert("로그인 후 삭제할 수 있습니다.");
             } else {
-                alert("본인이 작성한 글만 삭제 가능합니다.");
+                showAlert("본인이 작성한 글만 삭제할 수 있습니다.");
             }
         }
+
+        function showAlert(message, callback) {
+            $("#alertMessage").html(message);
+
+            $("#customAlert")
+                .css("display", "flex")  // flex로 중앙 정렬
+                .hide()
+                .fadeIn(200, function () {
+                    $(this).addClass("show"); // ✅ 애니메이션 효과 주기 위해 .show 추가
+                });
+
+            $("#alertOk").off("click").on("click", function () {
+                $("#customAlert").removeClass("show").fadeOut(150);
+                if (typeof callback === "function") callback();
+            });
+        }
     </script>
+
 </head>
 <body>
 
 <header>
-    <img class="logo" src="/assets/logo.png" alt="로고" />
+    <img class="logo" src="/assets/logo/logo.png" alt="로고" onclick="goMain()" style="cursor:pointer;" />
     <div class="menu-buttons">
         <button onclick="location.href='/notice/quizNoticeList'">공지사항</button>
-        <button onclick="location.href='/user/login'">로그인</button>
+
     </div>
 </header>
 
 <main>
     <div class="notice-detail-container">
         <div class="notice-detail-header">
-            <span class="notice-title" th:text="${rDTO.title}">공지사항</span>
-            <span class="notice-date" th:text="${#strings.substring(rDTO.regDt, 2, 10)}">25-03-18</span>
+    <span class="notice-title">
+        <span th:if="${rDTO.noticeYn eq 'Y'}">[공지]</span>
+        <span th:text="${rDTO.title}">공지 제목</span>
+    </span>
+            <span class="notice-date" th:text="${#strings.substring(rDTO.regDt, 2, 10)}">작성일</span>
         </div>
 
-        <div class="notice-content" th:text="${rDTO.contents}">
-            공지내용
-        </div>
+        <div class="notice-content" th:text="${rDTO.contents}">공지 내용</div>
 
         <div class="notice-back">
             <button id="btnEdit" type="button">수정</button>
@@ -83,7 +111,12 @@
             <button id="btnList" type="button">목록</button>
         </div>
     </div>
-</main>
-
+    <!-- 공통 알림창 -->
+    <div id="customAlert">
+        <div class="alert-box">
+            <div id="alertMessage">알림 메시지</div>
+            <button id="alertOk">확인</button>
+        </div>
+    </div>
 </body>
 </html>

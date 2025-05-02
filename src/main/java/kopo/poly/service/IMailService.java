@@ -1,6 +1,8 @@
 package kopo.poly.service;
 
+import kopo.poly.dto.MailDTO;
+
 public interface IMailService {
 
-    void sendPasswordResetMail(String toEmail, String resetUrl);
+    int doSendMail(MailDTO pDTO);
 }

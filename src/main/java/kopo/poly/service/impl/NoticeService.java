@@ -1,6 +1,5 @@
 package kopo.poly.service.impl;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import kopo.poly.dto.NoticeDTO;
 import kopo.poly.repository.NoticeRepository;
@@ -12,8 +11,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -26,22 +26,29 @@ public class NoticeService implements INoticeService {
     private final NoticeRepository noticeRepository;
 
     @Override
-    public List<NoticeDTO> getNoticeList() {
+    public Page<NoticeDTO> getNoticeList(int page, int size) {
 
-        log.
-                info("{}.getNoticeList Start!", this.getClass().getName());
+        log.info("{}.getNoticeList Start!", this.getClass().getName());
 
-        // 공지사항 전체 리스트 조회하기
-        List<NoticeEntity> rList = noticeRepository.findAllByOrderByNoticeSeqDesc();
+        // 페이징 설정 (페이지 번호는 0부터 시작)
+        Pageable pageable = PageRequest.of(page, size);
 
-        // 엔티티의 값들을 DTO에 맞게 넣어주기
-        List<NoticeDTO> nList = new ObjectMapper().convertValue(rList,
-                new TypeReference<>() {
-                });
+        // 공지사항 페이징 리스트 조회
+        Page<NoticeEntity> rPage = noticeRepository.findAllByOrderByNoticeSeqDesc(pageable);
+
+        // 엔티티 페이지 -> DTO 페이지 변환
+        Page<NoticeDTO> nPage = rPage.map(entity -> NoticeDTO.builder()
+                .noticeSeq(entity.getNoticeSeq())
+                .title(entity.getTitle())
+                .contents(entity.getContents())
+                .readCnt(entity.getReadCnt())
+                .regId(entity.getRegId())
+                .regDt(entity.getRegDt())
+                .build());
 
         log.info("{}.getNoticeList End!", this.getClass().getName());
 
-        return nList;
+        return nPage;
     }
 
     @Transactional
@@ -55,8 +62,7 @@ public class NoticeService implements INoticeService {
             int res = noticeRepository.updateReadCnt(pDTO.noticeSeq());
 
             // 조회수 증가 성공여부 체크
-            log.
-                    info("res : {}", res);
+            log.info("res : {}", res);
         }
 
         // 공지사항 상세내역 가져오기
@@ -65,8 +71,7 @@ public class NoticeService implements INoticeService {
         // 엔티티의 값들을 DTO에 맞게 넣어주기
         NoticeDTO rDTO = new ObjectMapper().convertValue(rEntity, NoticeDTO.class);
 
-        log.
-                info("{}.getNoticeInfo End!", this.getClass().getName());
+        log.info("{}.getNoticeInfo End!", this.getClass().getName());
 
         return rDTO;
     }

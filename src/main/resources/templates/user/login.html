@@ -1,93 +1,120 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head>
   <meta charset="UTF-8">
   <title>로그인 화면</title>
-  <link rel="stylesheet" href="/css/table.css"/>
+  <link rel="stylesheet" href="/css/MainStyle.css"/>
   <script type="text/javascript" src="/js/jquery-3.6.0.min.js"></script>
-  <script type="text/javascript">
+  <script th:inline="javascript">
 
-    // HTML로딩이 완료되고, 실행됨
     $(document).ready(function () {
+      const f = document.getElementById("f");
 
-      // 회원가입
-      $("#btnUserReg").on("click", function () { // 버튼 클릭했을때, 발생되는 이벤트 생성함(onclick 이벤트와 동일함)
-        location.href = "/user/userRegForm";
-      })
+      $("#btnLogin").on("click", function () {
+        const userId = f.userId.value;
+        const password = f.password.value;
 
-      // 메인화면
-      $("#btnMain").on("click", function () { // 버튼 클릭했을때, 발생되는 이벤트 생성함(onclick 이벤트와 동일함)
-        location.href = "/html/index.html";
-      })
-
-      // 로그인
-      $("#btnLogin").on("click", function () { // 버튼 클릭했을때, 발생되는 이벤트 생성함(onclick 이벤트와 동일함)
-        let f = document.getElementById("f"); // form 태그
-
-        if (f.user_id.value === "") {
-          alert("아이디를 입력하세요.");
-          f.user_id.focus();
+        if (!userId || !password) {
+          showAlert("아이디 또는 패스워드를 다시 입력해주세요.");
           return;
         }
 
-        if (f.password.value === "") {
-          alert("비밀번호를 입력하세요.");
-          f.password.focus();
-          return;
-        }
-
-        // Ajax 호출해서 로그인하기
         $.ajax({
-                  url: "/user/loginProc",
-                  type: "post", // 전송방식은 Post
-                  dataType: "JSON", // 전송 결과는 JSON으로 받기
-                  data: $("#f").serialize(), // form 태그 내 input 등 객체를 자동으로 전송할 형태로 변경하기
-                  success: function (json) { // /notice/noticeUpdate 호출이 성공했다면..
+          url: "/user/loginProc",
+          type: "post",
+          dataType: "json",
+          data: $("#f").serialize(),
+          success: function (json) {
+            if (json.result === 1) {
+              showAlert(json.msg, function () {
+                location.href = "/main/mainLoginSuccess";
+              });
+            } else {
+              showAlert(json.msg);
+            }
+          }
+        });
+      });
 
-                    if (json.result === 1) { // 로그인 성공
-                      alert(json.msg); // 메시지 띄우기
-                      location.href = "/user/loginSuccess"; // 로그인 성공 페이지 이동
+      $("#btnRegister").on("click", function () {
+        location.href = "/user/userRegForm";
+      });
 
-                    } else { // 로그인 실패
-                      alert(json.msg); // 메시지 띄우기
-                      $("#user_id").focus(); // 아이디 입력 항목에 마우스 커서 이동
-                    }
+      $("#btnFindPassword").on("click", function () {
+        location.href = "/user/findPassword";
+      });
 
-                  }
-                }
-        )
-      })
-    })
+      $("#btnChangePassword").on("click", function () {
+        $.ajax({
+          url: "/user/changePasswordCheck",
+          type: "get",
+          dataType: "json",
+          success: function (res) {
+            if (res.result === 1) {
+              location.href = "/user/changePassword";
+            } else {
+              showAlert(res.msg);
+            }
+          },
+          error: function () {
+            showAlert("세션 확인 중 오류가 발생했습니다.");
+          }
+        });
+      });
+
+
+    });
+
+    function showAlert(message, callback) {
+      $("#alertMessage").html(message);
+      $("#customAlert").css("display", "flex").hide().fadeIn(200, function () {
+        $(this).addClass("show");
+      });
+
+      $("#alertOk").off("click").on("click", function () {
+        $("#customAlert").removeClass("show").fadeOut(150);
+        if (typeof callback === "function") callback();
+      });
+    }
+
+    function goMain() {
+      const sessionUserId = /*[[${SS_USER_ID}]]*/ null;
+      if (sessionUserId === null || sessionUserId === "") {
+        location.href = "/main/mainPage";
+      } else {
+        location.href = "/main/mainLoginSuccess";
+      }
+    }
   </script>
 </head>
 <body>
-<h2>로그인하기</h2>
-<hr/>
-<br/>
-<form id="f">
-  <div class="divTable minimalistBlack">
-    <div class="divTableBody">
-      <div class="divTableRow">
-        <div class="divTableCell">아이디
-        </div>
-        <div class="divTableCell">
-          <input type="text" name="user_id" id="user_id" style="width:95%"/>
-        </div>
-      </div>
-      <div class="divTableRow">
-        <div class="divTableCell">비밀번호
-        </div>
-        <div class="divTableCell">
-          <input type="password" name="password" id="password" style="width:95%"/>
-        </div>
-      </div>
+<div class="login-container">
+  <form id="f" class="login-box">
+    <img class="logo" src="/assets/logo/logo.png" alt="로고" onclick="goMain()" style="cursor:pointer;" />
+    <h2>Login</h2>
+
+    <label class="login-label">User ID</label>
+    <input type="text" name="userId" class="login-input" placeholder="아이디를 입력해주세요"/>
+
+    <label class="login-label">Password</label>
+    <input type="password" name="password" class="login-input" placeholder="비밀번호를 입력해주세요"/>
+
+    <button type="button" id="btnLogin" class="login-button">Login</button>
+    <button type="button" id="btnRegister" class="login-button">Register</button>
+
+    <div class="login-footer">
+      · <a href="#" id="btnFindPassword">Forgot Password</a>
+      · <a href="#" id="btnChangePassword">Change Password</a>
     </div>
+  </form>
+</div>
+
+<!-- ✅ 공통 팝업창 HTML -->
+<div id="customAlert">
+  <div class="alert-box">
+    <div id="alertMessage">알림 메시지</div>
+    <button id="alertOk">확인</button>
   </div>
-  <div>
-    <button id="btnLogin" type="button">로그인</button>
-    <button id="btnUserReg" type="button">회원가입</button>
-    <button id="btnMain" type="button">메인화면</button>
-  </div>
-</form>
+</div>
 </body>
 </html>

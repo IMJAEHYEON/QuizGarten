@@ -5,6 +5,7 @@ import com.amazonaws.HttpMethod;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.model.GeneratePresignedUrlRequest;
 import com.amazonaws.services.s3.model.ObjectMetadata;
+import kopo.poly.service.IS3Service;
 import kopo.poly.util.FileUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,14 +25,14 @@ import java.util.UUID;
 @Slf4j
 @RequiredArgsConstructor
 @Service
-public class S3Service {
+public class S3Service implements IS3Service {
 
     @Value("${cloud.aws.s3.bucket}")
     private String bucket;
 
     private final AmazonS3 amazonS3;
 
-    /* 1. 파일 업로드 */
+    @Override
     public String upload(MultipartFile multipartFile, String s3FileName) throws IOException {
         ObjectMetadata objMeta = new ObjectMetadata();
         objMeta.setContentLength(multipartFile.getInputStream().available());
@@ -41,7 +42,7 @@ public class S3Service {
         return URLDecoder.decode(amazonS3.getUrl(bucket, s3FileName).toString(), "utf-8");
     }
 
-    /* 2. 파일 삭제 */
+    @Override
     public void delete(String keyName) {
         try {
             amazonS3.deleteObject(bucket, keyName);
@@ -50,7 +51,7 @@ public class S3Service {
         }
     }
 
-    /* 3. presigned URL 발급 */
+    @Override
     public String getPresignedURL(String keyName) {
         String preSignedURL = "";
         Date expiration = new Date();
@@ -72,9 +73,8 @@ public class S3Service {
         return preSignedURL;
     }
 
-    /* 4. submitFiles: 여러 파일 처리 */
+    @Override
     public ResponseEntity<?> submitFiles(List<MultipartFile> multipartFileList) throws IOException {
-
         List<String> uploadedUrls = new ArrayList<>();
 
         for (MultipartFile multipartFile : multipartFileList) {

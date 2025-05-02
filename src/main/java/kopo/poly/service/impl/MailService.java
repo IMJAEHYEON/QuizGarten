@@ -2,39 +2,63 @@ package kopo.poly.service.impl;
 
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
+import kopo.poly.dto.MailDTO;
 import kopo.poly.service.IMailService;
+import kopo.poly.util.CmmUtil;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class MailService implements IMailService {
 
     private final JavaMailSender mailSender;
 
-    @Override
-    public void sendPasswordResetMail(String toEmail, String resetUrl) {
-        try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, false, "UTF-8");
+    @Value("${spring.mail.username}")
+    private String fromMail;
 
-            helper.setTo(toEmail);
-            helper.setSubject("[MyQuiz] 비밀번호 재설정 안내");
-            helper.setText(buildEmailContent(resetUrl), true); // HTML 형식 허용
+    @Override
+    public int doSendMail(MailDTO pDTO) {
+
+        log.info("{}.doSendMail Start!", this.getClass().getName());
+
+        int res = 1;
+
+        if (pDTO == null) {
+            log.error("MailDTO가 null입니다.");
+            return 0;
+        }
+
+        String toMail = CmmUtil.nvl(pDTO.toMail());
+        String title = CmmUtil.nvl(pDTO.title());
+        String contents = CmmUtil.nvl(pDTO.contents());
+
+        log.info("toMail : {} / title : {} / contents : {}", toMail, title, contents);
+
+        MimeMessage message = mailSender.createMimeMessage();
+
+        try {
+            MimeMessageHelper messageHelper = new MimeMessageHelper(message, true, "UTF-8");
+
+            messageHelper.setTo(toMail);
+            messageHelper.setFrom(fromMail);
+            messageHelper.setSubject(title);
+            messageHelper.setText(contents, true);
 
             mailSender.send(message);
 
         } catch (MessagingException e) {
-            throw new RuntimeException("이메일 전송 실패", e);
+            res = 0;
+            log.info("[ERROR] doSendMail : {}", e.getMessage(), e);
         }
-    }
 
-    private String buildEmailContent(String resetUrl) {
-        return "<h3>[MyQuiz] 비밀번호 재설정 안내</h3>" +
-                "<p>아래 링크를 클릭하여 비밀번호를 재설정해 주세요:</p>" +
-                "<p><a href=\"" + resetUrl + "\">비밀번호 재설정하기</a></p>" +
-                "<p>본 메일은 30분 뒤 만료됩니다.</p>";
+        log.info("{}.doSendMail End!", this.getClass().getName());
+
+        return res;
     }
 }
