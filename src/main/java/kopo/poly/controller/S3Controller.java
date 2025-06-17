@@ -15,8 +15,23 @@ public class S3Controller {
 
     private final S3Service s3Service;
 
+    /**
+     * 다중 파일 업로드 (image/audio 분리됨)
+     */
     @PostMapping("/upload")
-    public ResponseEntity<?> submitFiles(@RequestParam("files") List<MultipartFile> multipartFileList) throws Exception {
+    public ResponseEntity<?> uploadFiles(@RequestParam("files") List<MultipartFile> multipartFileList) throws Exception {
         return s3Service.submitFiles(multipartFileList);
     }
+
+    /**
+     * 단일 파일 업로드 (image/audio 분리됨)
+     */
+    @PostMapping("/SingleUpload")
+    public ResponseEntity<String> uploadFile(@RequestPart("thumbnail") MultipartFile file) throws Exception {
+        String fileUrl = s3Service.uploadFileToS3(file);
+        return ResponseEntity.ok(fileUrl);
+    }
+
+
+
 }

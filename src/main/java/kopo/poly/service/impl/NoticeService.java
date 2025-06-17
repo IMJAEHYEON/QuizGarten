@@ -144,10 +144,10 @@ public class NoticeService implements INoticeService {
                 .chgId(userId).chgDt(DateUtil.getDateTime("yyyy-MM-dd hh:mm:ss"))
                 .build();
 
+        log.info("{}.InsertNoticeInfo End!", this.getClass().getName());
+
         // 공지사항 저장하기
         noticeRepository.save(pEntity);
-
-        log.info("{}.InsertNoticeInfo End!", this.getClass().getName());
 
     }
 }

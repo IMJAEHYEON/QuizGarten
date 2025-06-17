@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>QuizGarten</title>
+    <link rel="icon" href="/assets/logo/logo.png">
+    <link rel="stylesheet" href="/css/MainStyle.css">
+    <script src="/js/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+<div class="quiz-make-modal">
+    <h2>객관식 퀴즈 만들기</h2>
+
+    <label>문제 내용</label>
+    <textarea id="questionText" placeholder="문제를 입력하세요" style="width: 100%; height: 80px; margin-bottom: 15px;"></textarea>
+
+    <label>선택지</label>
+    <div id="choicesContainer">
+        <div><input type="text" class="choice" placeholder="선택지 1" style="width: 80%;" /> <input type="radio" name="correct" value="0" /> 정답</div>
+        <div><input type="text" class="choice" placeholder="선택지 2" style="width: 80%;" /> <input type="radio" name="correct" value="1" /> 정답</div>
+        <div><input type="text" class="choice" placeholder="선택지 3" style="width: 80%;" /> <input type="radio" name="correct" value="2" /> 정답</div>
+        <div><input type="text" class="choice" placeholder="선택지 4" style="width: 80%;" /> <input type="radio" name="correct" value="3" /> 정답</div>
+    </div>
+
+    <div class="button-group" style="margin-top: 20px;">
+        <button onclick="submitMultipleChoiceQuestion()">문제 저장</button>
+    </div>
+</div>
+
+<!-- 커스텀 알림 -->
+<div id="customAlert" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center;">
+    <div style="background:white; padding:30px; border-radius:10px; text-align:center;">
+        <div id="alertMessage"></div>
+        <button id="alertOk" style="margin-top:10px;">확인</button>
+    </div>
+</div>
+<script th:inline="javascript">
+    $(document).ready(function () {
+
+        const quizId = window.popupQuizId;
+        const quizDetailId = window.popupQuizDetailId;
+
+
+        if (quizId && quizDetailId) {
+            fetch(`/quiz/mongo/${quizId}/question/${quizDetailId}`)
+                .then(res => res.json())
+                .then(data => preloadQuestionData(data))
+                .catch(err => console.error("객관식 문제 불러오기 실패", err));
+        }
+
+        $('#alertOk').on('click', () => $('#customAlert').hide());
+    });
+
+    function preloadQuestionData(data) {
+        $('#questionText').val(data.questionText || '');
+
+        const choices = data.choices || [];
+        const answers = Array.isArray(data.answers) ? data.answers : [data.answer];
+
+        $('.choice').each(function (i) {
+            $(this).val(choices[i] || '');
+            if (answers.includes(choices[i])) {
+                $(`input[name="correct"][value="${i}"]`).prop('checked', true);
+            }
+        });
+    }
+
+    function submitMultipleChoiceQuestion() {
+        const quizId = window.popupQuizId || null;
+        const quizDetailId = window.popupQuizDetailId || null;
+
+        const questionText = $('#questionText').val().trim();
+        const choices = $('.choice').map((_, el) => $(el).val().trim()).get();
+        const selectedIndex = $('input[name="correct"]:checked').val();
+
+        if (!questionText) return showAlert("문제 내용을 입력하세요.");
+        if (choices.some(c => !c)) return showAlert("모든 선택지를 입력하세요.");
+        if (selectedIndex === undefined) return showAlert("정답을 선택하세요.");
+
+        const dto = {
+            quizId: quizId,
+            quizDetailId: quizDetailId,
+            questionText: questionText,
+            choices: choices,
+            answers: [choices[selectedIndex]]
+        };
+
+        $.ajax({
+            url: `/quiz/mongo/${quizId}/multiple-question`,
+            method: "POST",
+            contentType: "application/json",
+            data: JSON.stringify(dto),
+            success: function () {
+                showAlert("객관식 문제가 저장되었습니다.", () => {
+                    window.location.reload();
+                });
+            },
+            error: function () {
+                showAlert("문제 저장에 실패했습니다.");
+            }
+        });
+    }
+
+    function showAlert(msg, callback) {
+        $('#alertMessage').text(msg);
+        $('#customAlert').css('display', 'flex');
+        $('#alertOk').off('click').on('click', function () {
+            $('#customAlert').hide();
+            if (typeof callback === 'function') callback();
+        });
+    }
+</script>
+</body>
+</html>

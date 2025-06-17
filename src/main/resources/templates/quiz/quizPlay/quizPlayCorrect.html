@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>QuizGarten</title>
+    <link rel="icon" href="/assets/logo/logo.png">
+    <link rel="stylesheet" href="/css/MainStyle.css">
+    <link rel="stylesheet" href="/css/QuizPlayStyle.css">
+    <script src="/js/jquery-3.6.0.min.js"></script>
+    <script src="https://www.youtube.com/iframe_api"></script>
+</head>
+<body>
+<header>
+    <img class="logo" src="/assets/logo/logo.png" onclick="goMain()" style="cursor:pointer;" />
+</header>
+
+<main>
+    <div class="quiz-play-container">
+        <div id="quizContent" class="quiz-box"></div>
+        <div class="feedback-section">
+            <div id="resultText"></div>
+            <div id="userAnswerText"></div>
+            <button onclick="nextQuiz()">→</button>
+        </div>
+    </div>
+</main>
+
+<script th:inline="javascript">
+    const params = new URLSearchParams(location.search);
+    const quizType = params.get("type");
+    const quizDetail = JSON.parse(localStorage.getItem("currentQuizDetail") || "{}");
+    const userAnswer = decodeURIComponent(params.get("userAnswer") || "").trim();
+    const quizId = quizDetail.quizId || params.get("quiz");
+    const correctAnswers = (quizDetail.quizAnswer || "").split(",");
+    const isCorrect = correctAnswers.includes(userAnswer);
+    let audioPlayer;
+
+
+    $(document).ready(() => {
+        $("#resultText").text(isCorrect ? "정답!" : "오답!");
+
+        saveResultToLocalStorage(quizId, quizDetail.quizDetailId, isCorrect);
+
+        switch (quizType) {
+            case "image":
+                renderImageAnswer(quizDetail);
+                break;
+            case "audio":
+                renderAudioAnswer(quizDetail);
+                break;
+            case "multiple":
+            case "ai":
+                renderMultipleAnswer(quizDetail, userAnswer, quizDetail.quizAnswer);
+                break;
+        }
+    });
+
+    console.log("정답 목록:", correctAnswers);
+    console.log("입력한 정답:", userAnswer);
+    console.log("비교 결과:", correctAnswers.includes(userAnswer));
+
+    function renderImageAnswer(q) {
+        const imageUrl = q.imageUrl || q.awsImageUrl || "";
+        $("#quizContent").html(`<img src="${imageUrl}" class="quiz-preview-img" />`);
+    }
+
+    function renderAudioAnswer(q) {
+        const questionId = q.quizDetailId;
+        const startTime = parseFloat(q.audioStartTime || 0);
+
+        fetch(`/quiz/mongo/${quizId}/question/${questionId}/youtube-id`)
+            .then(res => {
+                if (!res.ok) throw new Error("YouTube ID fetch failed");
+                return res.text();
+            })
+            .then(videoId => {
+                $("#quizContent").html(`<div id="player"></div>`);
+
+                window.onYouTubeIframeAPIReady = function () {
+                    audioPlayer = new YT.Player("player", {
+                        height: "180",
+                        width: "320",
+                        videoId: videoId,
+                        playerVars: {
+                            autoplay: 1,
+                            controls: 1,
+                            start: Math.floor(startTime)
+                        },
+                        events: {
+                            onReady: () => {
+                                audioPlayer.seekTo(startTime);
+                                audioPlayer.playVideo();
+                            }
+                        }
+                    });
+                };
+
+                if (window.YT && window.YT.Player) {
+                    window.onYouTubeIframeAPIReady();
+                }
+            })
+            .catch(() => {
+                $("#quizContent").html(`<p style="color:red;">유튜브 재생에 실패했습니다.</p>`);
+            });
+    }
+
+
+    function renderMultipleAnswer(q, userAns, correctAns) {
+        const userTrim = userAns.trim();
+        const correctList = correctAns.split(",").map(s => s.trim());
+
+        const choicesHtml = (q.choices || []).map(choice => {
+            const trimmed = choice.trim();
+            const isUserChoice = trimmed === userTrim;
+            const isCorrect = correctList.includes(trimmed);
+            const btnClass = isUserChoice ? "quiz-choice selected" : "quiz-choice";
+
+            return `
+            <div class="choice-wrapper">
+                <button class="${btnClass}" disabled>${trimmed}</button>
+                ${isCorrect ? `<div class="correct-label">정답</div>` : ""}
+            </div>
+        `;
+        }).join("");
+
+        $("#quizContent").html(`
+        <div class="question-text">${q.questionText}</div>
+        <div class="choice-list">${choicesHtml}</div>
+    `);
+    }
+
+    function saveResultToLocalStorage(quizId, quizDetailId, isCorrect) {
+        const resultKey = `quizResults_${quizId}`;
+        let resultList = JSON.parse(localStorage.getItem(resultKey) || "[]");
+
+        // 이미 저장된 경우 덮어쓰기
+        const exists = resultList.find(r => r.quizDetailId === quizDetailId);
+        if (!exists) {
+            resultList.push({
+                quizDetailId,
+                userAnswer,
+                correct: isCorrect
+            });
+            localStorage.setItem(resultKey, JSON.stringify(resultList));
+        }
+    }
+
+
+    function nextQuiz() {
+        const nextUrl = localStorage.getItem("nextQuizUrl");
+        localStorage.removeItem("currentQuizDetail");
+        localStorage.removeItem("nextQuizUrl");
+
+        if (nextUrl) {
+            location.href = nextUrl;
+        } else {
+            location.href = "/main/mainPage";
+        }
+    }
+
+    function goMain() {
+        const userId = /*[[${SS_USER_ID}]]*/ null;
+        location.href = userId ? "/main/mainLoginSuccess" : "/main/mainPage";
+    }
+</script>
+</body>
+</html>

@@ -3,7 +3,7 @@ package kopo.poly.dto;
 import lombok.Builder;
 import lombok.ToString;
 
-@Builder
+@Builder(toBuilder = true)
 public record MailDTO(
 
        String toMail, // 받는 사람

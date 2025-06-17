@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8" />
+    <title>QuizGarten</title>
+    <link rel="icon" href="/assets/logo/logo.png">
+    <link rel="stylesheet" href="/css/MainStyle.css" />
+    <link rel="stylesheet" href="/css/QuizPlayStyle.css" />
+    <link rel="stylesheet" href="/css/QuizCompleteStyle.css" />
+</head>
+<body>
+
+<header>
+    <img class="logo" src="/assets/logo/logo.png" onclick="goMain()" style="cursor:pointer;" />
+</header>
+
+<main>
+    <div class="quiz-complete-container">
+        <h1>퀴즈 완료!</h1>
+        <h2 id="resultText">결과를 불러오는 중입니다...</h2>
+        <button onclick="restartQuiz()">처음부터 다시 풀기</button>
+    </div>
+</main>
+
+<script th:inline="javascript">
+    // 1. quizId를 URL 또는 localStorage에서 불러오기
+    let quizId = new URLSearchParams(location.search).get("quiz");
+
+    if (!quizId || quizId === "null") {
+        quizId = localStorage.getItem("lastPlayedQuizId");
+    }
+
+    if (!quizId) {
+        alert("퀴즈 ID가 없습니다. 메인으로 이동합니다.");
+        location.href = "/main/mainPage";
+    }
+
+    // 2. 정답 결과 불러오기
+    const resultKey = `quizResults_${quizId}`;
+    const resultList = JSON.parse(localStorage.getItem(resultKey) || "[]");
+
+    const correctCount = resultList.filter(r => r.correct).length;
+    const totalCount = resultList.length;
+
+    // 3. 결과 출력
+    document.getElementById("resultText").innerText = `정답 ${correctCount} / ${totalCount}`;
+
+    // 4. 처음부터 다시 풀기
+    function restartQuiz() {
+        if (!quizId) {
+            alert("퀴즈 ID가 없습니다. 메인으로 이동합니다.");
+            location.href = "/main/mainPage";
+            return;
+        }
+
+        // 푼 문제 기록 초기화
+        localStorage.removeItem(`solvedQuizDetails_${quizId}`);
+        localStorage.removeItem(`quizResults_${quizId}`);
+
+        // 퀴즈 정보 페이지로 이동
+        location.href = `/quiz/playInfo?quiz=${quizId}`;
+    }
+
+    // 5. 메인 이동
+    function goMain() {
+        const userId = /*[[${SS_USER_ID}]]*/ null;
+        location.href = userId ? "/main/mainLoginSuccess" : "/main/mainPage";
+    }
+</script>
+</body>
+</html>

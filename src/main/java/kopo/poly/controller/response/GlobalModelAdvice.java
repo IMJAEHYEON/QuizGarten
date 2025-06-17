@@ -13,4 +13,5 @@ public class GlobalModelAdvice {
         String sessionUserId = (String) session.getAttribute("SS_USER_ID");
         model.addAttribute("SS_USER_ID", sessionUserId);
     }
+
 }

@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>QuizGarten</title>
+    <link rel="icon" href="/assets/logo/logo.png">
+    <link rel="stylesheet" href="/css/MainStyle.css">
+    <script src="/js/jquery-3.6.0.min.js"></script>
+    <script src="https://www.youtube.com/iframe_api"></script>
+</head>
+<body>
+<div id="popupContent" class="modal-layout">
+    <h2>오디오 퀴즈 만들기</h2>
+
+    <label>유튜브 링크</label>
+    <input type="text" id="youtubeUrl" placeholder="https://youtu.be/xxxxxxx" style="width:100%; margin-bottom:10px;">
+    <button id="loadVideoBtn">영상 불러오기</button>
+
+    <div class="audio-player-section">
+        <div id="player" style="margin-top:20px;"></div>
+        <div class="time-display">
+            시작: <span id="startTimeDisplay">00:00</span> ~ 끝: <span id="endTimeDisplay">영상 끝</span>
+        </div>
+        <div class="time-buttons">
+            <button id="setStartBtn">현재 시간으로 시작 설정</button>
+            <button id="setEndBtn">현재 시간으로 끝 설정</button>
+        </div>
+    </div>
+
+    <div>
+        <h3>정답 입력</h3>
+        <input type="text" id="answerInput" placeholder="정답 입력" style="width:70%;">
+        <button id="addAnswerBtn">추가</button>
+        <div id="answerContainer"></div>
+    </div>
+
+    <div class="button-group">
+        <button id="saveBtn">저장하기</button>
+    </div>
+
+    <div id="customAlert" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center;">
+        <div style="background:white; padding:30px; border-radius:10px; text-align:center;">
+            <div id="alertMessage"></div>
+            <button id="alertOk" style="margin-top:10px;">확인</button>
+        </div>
+    </div>
+</div>
+<script th:inline="javascript">
+    let player, startTime = 0, endTime = 0, answers = [], initialVideoId = null;
+
+    function onYouTubeIframeAPIReady() {
+        if (initialVideoId) {
+            loadYoutubeVideo(initialVideoId);
+        } else {
+            loadYoutubeVideo(null);
+        }
+    }
+
+    function loadYoutubeVideo(videoId) {
+        if (!videoId) {
+            $('#player').html(`
+                <div style="width:640px;height:360px;background:#000;display:flex;align-items:center;justify-content:center;color:#fff;">
+                    유효한 영상이 없습니다.
+                </div>
+            `);
+            return;
+        }
+
+        if (window.YT && typeof YT.Player === 'function') {
+            if (player && typeof player.loadVideoById === 'function') {
+                player.loadVideoById(videoId);
+            } else {
+                player = new YT.Player('player', {
+                    height: '360',
+                    width: '640',
+                    videoId: videoId,
+                    events: { 'onReady': () => {} }
+                });
+            }
+        } else {
+            setTimeout(() => loadYoutubeVideo(videoId), 200);
+        }
+    }
+
+    $(document).ready(function () {
+        const sessionUserId = /*[[${SS_USER_ID}]]*/ null;
+        if (!sessionUserId) {
+            alert("로그인 후 이용할 수 있습니다.");
+            location.href = "/main/mainPage";
+            return;
+        }
+
+        const quizId = window.popupQuizId;
+        const quizDetailId = window.popupQuizDetailId;
+
+        loadYoutubeVideo(null);
+
+        if (quizId && quizDetailId) {
+            fetch(`/quiz/mongo/${quizId}/question/${quizDetailId}`)
+                .then(res => res.json())
+                .then(data => {
+                    let youtubeUrl = data.youtubeUrl;
+
+                    if (!youtubeUrl && data.audioUrl && data.audioUrl.endsWith('.txt')) {
+                        // 기존 .txt 파일 처리
+                        fetch(`/quiz/mongo/${quizId}/question/${quizDetailId}/youtube-id`)
+                            .then(res => res.text())
+                            .then(videoId => {
+                                if (videoId && videoId !== 'invalid_url') {
+                                    youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
+                                    $('#youtubeUrl').val(youtubeUrl);
+                                    initialVideoId = videoId;
+                                }
+                            });
+                    } else if (!youtubeUrl && data.audioUrl?.includes('youtube.com')) {
+                        youtubeUrl = data.audioUrl;
+                        $('#youtubeUrl').val(youtubeUrl);
+                        const videoId = extractVideoIdFromUrl(youtubeUrl);
+                        if (videoId) initialVideoId = videoId;
+                    } else if (youtubeUrl) {
+                        $('#youtubeUrl').val(youtubeUrl);
+                        const videoId = extractVideoIdFromUrl(youtubeUrl);
+                        if (videoId) initialVideoId = videoId;
+                    }
+
+
+                    startTime = parseFloat(data.audioStartTime) || 0;
+                    endTime = parseFloat(data.audioEndTime) || 0;
+                    $('#startTimeDisplay').text(formatTime(startTime));
+                    $('#endTimeDisplay').text(formatTime(endTime));
+
+                    answers = Array.isArray(data.answers) ? data.answers : [data.answer];
+                    renderAnswers();
+                })
+                .catch(err => console.error("오디오 문제 불러오기 실패", err));
+        }
+
+        $('#loadVideoBtn').on('click', function () {
+            const url = $("#youtubeUrl").val().trim();
+            const videoId = extractVideoIdFromUrl(url);
+            if (videoId) {
+                loadYoutubeVideo(videoId);
+            } else {
+                alert("유효한 YouTube 링크를 입력해주세요.");
+            }
+        });
+
+        $('#setStartBtn').on('click', function () {
+            if (player) {
+                startTime = player.getCurrentTime();
+                $('#startTimeDisplay').text(formatTime(startTime));
+            }
+        });
+
+        $('#setEndBtn').on('click', function () {
+            if (player) {
+                endTime = player.getCurrentTime();
+                $('#endTimeDisplay').text(formatTime(endTime));
+            }
+        });
+
+        $('#addAnswerBtn').on('click', function () {
+            const answer = $('#answerInput').val().trim();
+            if (answer) {
+                answers.push(answer);
+                renderAnswers();
+                $('#answerInput').val('');
+            }
+        });
+
+        $(document).on('click', '.remove-btn', function () {
+            const idx = $(this).data('index');
+            answers.splice(idx, 1);
+            renderAnswers();
+        });
+
+        $('#saveBtn').on('click', function () {
+            if (!quizId) return alert("퀴즈 ID가 없습니다.");
+
+            const data = {
+                quizDetailId: quizDetailId,
+                youtubeUrl: $("#youtubeUrl").val(),
+                audioStartTime: startTime,
+                audioEndTime: endTime,
+                answers: answers
+            };
+
+            $.ajax({
+                url: `/quiz/mongo/${quizId}/audio-question`,
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(data),
+                success: function () {
+                    alert("오디오 퀴즈가 저장되었습니다.");
+                    $('#popupContainer').fadeOut();
+                    if (window.parent && typeof window.parent.fetchQuestions === "function") {
+                        window.parent.fetchQuestions();
+                    }
+                },
+                error: function () {
+                    alert("저장 중 오류가 발생했습니다.");
+                }
+            });
+        });
+    });
+
+    function extractVideoIdFromUrl(url) {
+        try {
+            const parsed = new URL(url);
+            const host = parsed.hostname;
+            if (host.includes("youtu.be")) {
+                return parsed.pathname.substring(1);
+            }
+            if (host.includes("youtube.com")) {
+                const params = new URLSearchParams(parsed.search);
+                return params.get("v");
+            }
+        } catch (e) {
+            console.warn("유튜브 URL 파싱 실패", e);
+        }
+        return null;
+    }
+
+    function renderAnswers() {
+        $('#answerContainer').empty();
+        answers.forEach((ans, idx) => {
+            $('#answerContainer').append(`
+                <div class="answer-item">
+                    <span>${ans}</span>
+                    <span class="remove-btn" data-index="${idx}">삭제</span>
+                </div>
+            `);
+        });
+    }
+
+    function formatTime(seconds) {
+        const minutes = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+</script>
+</body>
+</html>

@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>QuizGarten</title>
+    <link rel="icon" href="/assets/logo/logo.png">
+    <link rel="stylesheet" href="/css/MainStyle.css">
+    <script src="/js/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+<header>
+    <img class="logo" src="/assets/logo/logo.png" alt="로고" onclick="goMain()" style="cursor:pointer;" />
+    <div class="menu-buttons">
+        <button onclick="openSettings()">설정</button>
+        <button onclick="history.back()">취소</button>
+        <button onclick="saveQuiz()">저장</button>
+    </div>
+</header>
+
+<main>
+    <div class="quiz-edit-container">
+        <div id="questionList" class="quiz-container"></div>
+    </div>
+</main>
+
+<!-- 팝업 컨테이너 -->
+<div id="popupContainer" class="modal" style="display:none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;">
+    <div class="modal-content" id="popupContent" style="position: relative;">
+        <button class="close-button" onclick="closePopup()">✖</button>
+    </div>
+</div>
+
+<script th:inline="javascript">
+    let quizId = new URLSearchParams(window.location.search).get("quiz");
+    let quizType = null;
+
+    $(document).ready(function() {
+        const sessionUserId = /*[[${SS_USER_ID}]]*/ null;
+        if (!sessionUserId) {
+            alert("로그인 후 이용할 수 있습니다.");
+            location.href = "/main/mainPage";
+            return;
+        }
+
+        if (!quizId) {
+            openQuizTypeSelector();
+        } else {
+            loadQuestions();
+        }
+    });
+
+
+    // 기존 퀴즈 불러오기
+    function loadQuestions() {
+        fetch(`/quiz/info/${quizId}`)
+            .then(res => res.ok ? res.json() : fetch(`/quiz/mongo/${quizId}/info`).then(r => r.json()))
+            .then(info => {
+                if (!info) {
+                    renderEmptyQuestionList();
+                    return;
+                }
+                quizType = info.quizType;
+                window.quizCategory = info.quizCategory;
+                fetchQuestions();
+            })
+            .catch(err => console.error("퀴즈 정보 로드 실패", err));
+    }
+
+
+
+    function renderEmptyQuestionList() {
+        const list = document.getElementById("questionList");
+        const addCard = document.createElement("div");
+        addCard.className = "quiz-card add-card";
+
+        let innerHtml = `<div class="quiz-thumbnail" style="display:flex; align-items:center; justify-content:center; height: 100%;"><span style="font-size: 16px;">문제를 추가해주세요.</span></div>`;
+
+
+        // AI 퀴즈인 경우 자동 생성 버튼도 함께 추가
+        if (quizType === 'ai') {
+            innerHtml += `<button onclick="generateAiQuestions()" style="margin-top:10px;">AI 자동 생성</button>`;
+        }
+
+        addCard.innerHTML = innerHtml;
+        addCard.onclick = () => selectQuizType(quizType);
+        list.appendChild(addCard);
+    }
+
+
+    // 문제 불러오기 및 화면 표시
+    function fetchQuestions() {
+        fetch(`/quiz/mongo/${quizId}/questions`)
+            .then(res => res.json())
+            .then(questions => {
+                window.loadedQuestions = questions;
+                const list = document.getElementById("questionList");
+                list.innerHTML = "";
+
+                questions.forEach(q => {
+                    const card = document.createElement("div");
+                    card.id = `card-${q.quizDetailId}`;
+                    card.className = "quiz-card edit-card";
+
+                    let imageUrl = q.quizImageCut || q.imageUrl;
+
+                    card.innerHTML = `
+                    <div class="quiz-thumbnail">
+                        <img src="${imageUrl || '/assets/logo/logo.png'}" alt="퀴즈 썸네일" />
+                    </div>
+                    <button class="delete-icon" onclick="deleteQuestion('${q.quizDetailId}', event)">🗑️</button>
+                `;
+
+                    card.onclick = () => editQuestion(q.quizDetailId);
+                    list.appendChild(card);
+
+                    // 유튜브 썸네일 자동 표시
+                    if (!imageUrl && q.audioUrl) {
+                        fetch(`/quiz/mongo/${quizId}/question/${q.quizDetailId}/youtube-id`)
+                            .then(res => res.text())
+                            .then(videoId => {
+                                if (videoId && videoId !== "invalid_url") {
+                                    const youtubeThumb = `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`;
+                                    const img = card.querySelector("img");
+                                    if (img) img.src = youtubeThumb;
+                                }
+                            });
+                    }
+                });
+
+                renderEmptyQuestionList();
+            });
+    }
+
+
+
+    // 문제 수정
+    function editQuestion(quizDetailId) {
+        const question = window.loadedQuestions.find(q => q.quizDetailId === quizDetailId);
+        window.popupQuizId = quizId;
+        window.popupQuizDetailId = quizDetailId;
+        window.popupAnswers = question.answers || [];
+
+        const url = `/quiz/makeQuiz${capitalizeFirstLetter(quizType)}Question?quiz=${quizId}&quizDetailId=${quizDetailId}`;
+        loadPopup(url);
+    }
+
+    // 문제 추가 팝업 (수정)
+    function selectQuizType(type, questionId = null) {
+        console.log("selectQuizType 호출됨", { quizId, type, questionId });
+        let url = `/quiz/makeQuiz${capitalizeFirstLetter(type)}Question?quiz=${quizId}`;
+        if (questionId) {
+            url += `&questionId=${questionId}`; // 수정 모드 지원
+        }
+        console.log("생성된 URL:", url);
+        loadPopup(url);
+    }
+
+
+    // 문제 삭제
+    function deleteQuestion(quizDetailId, event) {
+        event.stopPropagation();
+        if (!confirm("정말로 삭제하시겠습니까?")) return;
+        fetch(`/quiz/mongo/${quizId}/question/${quizDetailId}`, { method: 'DELETE' })
+            .then(() => {
+                alert("문제가 삭제되었습니다.");
+                fetchQuestions();
+            })
+            .catch(() => alert("문제 삭제에 실패했습니다."));
+    }
+
+    // 설정(퀴즈 정보 수정)
+    function openSettings() {
+        const popupHtml = `
+            <h2>퀴즈 정보 수정</h2>
+            <input id="quizTitle" type="text" placeholder="제목" style="width:100%; margin-bottom:10px;" />
+            <textarea id="quizDesc" placeholder="설명" style="width:100%; margin-bottom:10px;"></textarea>
+            <input id="quizThumbnailFile" type="file" accept="image/*" style="width:100%; margin-bottom:10px;" />
+            <div id="thumbnailPreview" style="margin-bottom:10px;"></div>
+            <div style="margin-bottom:10px;">
+                <label>공개 여부: <input id="quizPublic" type="checkbox" /></label>
+            </div>
+            <button onclick="saveQuizInfo()">확인</button>
+            <button onclick="closePopup()">취소</button>
+        `;
+        $('#popupContent').html(popupHtml);
+        $('#popupContainer').fadeIn(300);
+
+        if (quizId) {
+            fetch(`/quiz/mongo/${quizId}/info`)
+                .then(res => res.json())
+                .then(data => {
+                    $('#quizTitle').val(data.title || '');
+                    $('#quizDesc').val(data.description || '');
+                    if (data.thumbnailUrl) {
+                        $('#thumbnailPreview').html('<img src="' + data.thumbnailUrl + '" style="max-width:100%;height:auto;" />');
+                    }
+                    $('#quizPublic').prop('checked', data.visibility === 'Y');
+                });
+        }
+
+        $(document).on('change', '#quizThumbnailFile', function() {
+            const file = this.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    $('#thumbnailPreview').html('<img src="' + e.target.result + '" style="max-width:100%;height:auto;" />');
+                };
+                reader.readAsDataURL(file);
+            } else {
+                $('#thumbnailPreview').empty();
+            }
+        });
+    }
+
+    // 새 퀴즈 만들기 - 유형 선택
+    function openQuizTypeSelector() {
+        const popupHtml = `
+            <h2>퀴즈 만들기 - 유형 선택</h2>
+            <p>어떤 유형의 퀴즈를 만들까요?</p>
+            <button onclick="startNewQuiz('image')">이미지 퀴즈</button>
+            <button onclick="startNewQuiz('audio')">오디오 퀴즈</button>
+            <button onclick="startNewQuiz('multiple')">객관식 퀴즈</button>
+            <button onclick="startNewQuiz('ai')">AI 객관식 퀴즈</button>
+        `;
+        $('#popupContent').html(popupHtml);
+        $('#popupContainer').fadeIn(300);
+    }
+
+    // 새 퀴즈 생성 프로세스
+    function startNewQuiz(type) {
+        quizType = type;
+
+        let popupHtml = '';
+
+        if (type === 'ai') {
+            // AI 퀴즈용 폼
+            popupHtml = `
+            <h2>AI 객관식 퀴즈 정보 입력</h2>
+            <input id="quizTitle" type="text" placeholder="제목" style="width:100%; margin-bottom:10px;" />
+            <textarea id="quizDesc" placeholder="설명" style="width:100%; margin-bottom:10px;"></textarea>
+            <input id="quizCategory" type="text" placeholder="AI 퀴즈 주제 (예: 동물, 과일)" style="width:100%; margin-bottom:10px;" />
+            <input id="quizThumbnailFile" type="file" accept="image/*" style="width:100%; margin-bottom:10px;" />
+            <div id="thumbnailPreview" style="margin-bottom:10px;"></div>
+            <div style="margin-bottom:10px;">
+                <label>공개 여부: <input id="quizPublic" type="checkbox" /></label>
+            </div>
+            <button onclick="createQuiz()">퀴즈 생성</button>
+            <button onclick="closePopup()">취소</button>
+        `;
+        } else {
+            // 일반 퀴즈용 폼
+            popupHtml = `
+            <h2>퀴즈 정보 입력</h2>
+            <input id="quizTitle" type="text" placeholder="제목" style="width:100%; margin-bottom:10px;" />
+            <textarea id="quizDesc" placeholder="설명" style="width:100%; margin-bottom:10px;"></textarea>
+            <input id="quizThumbnailFile" type="file" accept="image/*" style="width:100%; margin-bottom:10px;" />
+            <div id="thumbnailPreview" style="margin-bottom:10px;"></div>
+            <div style="margin-bottom:10px;">
+                <label>공개 여부: <input id="quizPublic" type="checkbox" /></label>
+            </div>
+            <button onclick="createQuiz()">퀴즈 생성</button>
+            <button onclick="closePopup()">취소</button>
+        `;
+        }
+
+        $('#popupContent').html(popupHtml);
+    }
+
+
+
+    // 퀴즈 생성 요청
+    function createQuiz() {
+        const title = $('#quizTitle').val().trim();
+        const description = $('#quizDesc').val().trim();
+        const fileInput = $('#quizThumbnailFile')[0];
+        const visibility = $('#quizPublic').is(':checked') ? 'Y' : 'N';
+
+        if (!title || !description || fileInput.files.length === 0) {
+            alert("모든 항목을 입력해 주세요.");
+            return;
+        }
+
+        const file = fileInput.files[0];
+        const formData = new FormData();
+        formData.append('thumbnail', file);
+
+        // S3 업로드
+        fetch('/s3/SingleUpload', {
+            method: 'POST',
+            body: formData
+        })
+            .then(res => res.text())
+            .then(s3Url => {
+                const quizData = {
+                    quizType,
+                    quizTitle: title,
+                    description,
+                    thumbnailUrl: s3Url,
+                    visibility,
+                    quizCategory: quizType === 'ai' ? $('#quizCategory').val().trim() : null
+                };
+                const quizFormData = new FormData();
+                quizFormData.append('quizInfo', new Blob([JSON.stringify({ quiz: quizData, details: [] })], { type: 'application/json' }));
+                return fetch('/quiz/quizCreate/saveInfo', {
+                    method: 'POST',
+                    body: quizFormData
+                });
+            })
+            .then(res => {
+                if (!res.ok) {
+                    throw new Error("퀴즈 생성에 실패했습니다.");
+                }
+                return res.text();
+            })
+            .then(newQuizId => {
+                quizId = newQuizId;
+                console.log("새로 생성된 quizId:", quizId);
+
+                // 팝업 닫기
+                closePopup();
+
+                //  페이지 이동 (퀴즈ID 포함)
+                window.location.href = `/quiz/makeQuizEdit?quiz=${quizId}`;
+            })
+
+    }
+
+    function generateAiQuestions() {
+        if (!confirm("AI를 사용해 객관식 문제를 자동 생성하시겠습니까?")) return;
+
+        fetch(`/quiz/info/${quizId}`)
+            .then(res => res.json())
+            .then(info => {
+                const dto = {
+                    quizId: quizId,
+                    prompt: "",
+                    category: info.quizCategory || "일반"
+                };
+
+                return fetch("/quiz/quiz/generate-ai", {
+                    method: "POST",
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(dto)
+                });
+            })
+            .then(res => {
+                if (!res.ok) throw new Error("AI 생성 실패");
+                return res.text();
+            })
+            .then(() => {
+                alert("AI 객관식 문제가 생성되었습니다.");
+                fetchQuestions(); // 새로고침
+            })
+            .catch(err => {
+                console.error("AI 퀴즈 생성 실패", err);
+                alert("AI 퀴즈 생성 중 오류가 발생했습니다.");
+            });
+    }
+
+    // 팝업 로딩 (전역 변수 전달 방식으로 수정)
+    function loadPopup(url) {
+        const urlParams = new URLSearchParams(url.split('?')[1]);
+        window.popupQuizId = urlParams.get("quiz");
+        window.popupQuizDetailId = urlParams.get("quizDetailId");
+
+        $('#popupContent').load(url, function () {
+            $('#popupContent').prepend('<button class="close-button" onclick="closePopup()">✖</button>');
+            $('#popupContent script').each(function () {
+                $.globalEval(this.text || this.textContent || this.innerHTML || '');
+            });
+            $('#popupContainer').fadeIn();
+        });
+    }
+
+    // 팝업 닫기
+    function closePopup() {
+        $('#popupContainer').fadeOut();
+        location.reload();
+    }
+
+    // 첫 글자 대문자 변환
+    function capitalizeFirstLetter(str) {
+        return str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
+    }
+
+    // 퀴즈 저장
+    function saveQuiz() {
+        fetch(`/quiz/mongo/${quizId}/questions`)
+            .then(res => res.json())
+            .then(questions => {
+                return fetch(`/quiz/mongo/${quizId}/questions`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(questions)
+                });
+            })
+            .then(() => {
+                alert("퀴즈가 저장되었습니다.");
+                window.location.href = "/main/myPage";
+            })
+            .catch(() => {
+                alert("퀴즈 저장에 실패했습니다.");
+            });
+    }
+
+    // 퀴즈 정보 저장
+    function saveQuizInfo() {
+        const title = $('#quizTitle').val().trim();
+        const description = $('#quizDesc').val().trim();
+        const fileInput = $('#quizThumbnailFile')[0];
+        const visibility = $('#quizPublic').is(':checked') ? 'Y' : 'N';
+
+        if (!title || !description) {
+            alert("제목과 설명을 입력해 주세요.");
+            return;
+        }
+
+        const file = fileInput.files.length > 0 ? fileInput.files[0] : null;
+
+        // 수정됨: JSON 대신 multipart로 처리 → submitQuizInfo 호출
+        submitQuizInfo(title, description, visibility, file); // 수정된 호출 방식
+    }
+
+    // 수정됨: multipart 요청으로 전환
+    function submitQuizInfo(title, description, visibility, file) {
+        const quizPayload = {
+            quizId, // quizId는 전역에서 선언됨
+            title,
+            description,
+            visibility
+        };
+
+        const formData = new FormData();
+        formData.append("quiz", new Blob([JSON.stringify(quizPayload)], { type: "application/json" }));
+
+        // 항상 동일한 키 thumbnailFile 사용
+        if (file) {
+            formData.append("thumbnailFile", file); // 수정된 키
+        }
+
+        fetch(`/quiz/mongo/info`, {
+            method: 'PUT',
+            body: formData
+        })
+            .then(() => {
+                alert("퀴즈 정보가 저장되었습니다.");
+
+                // 퀴즈 타입 재설정
+                fetch(`/quiz/mongo/${quizId}/info`)
+                    .then(res => res.json())
+                    .then(data => {
+                        quizType = data.quizType;
+                        console.log("설정 후 퀴즈 타입 갱신됨:", quizType);
+                    });
+
+                closePopup();
+            })
+            .catch(() => alert("퀴즈 정보 저장에 실패했습니다."));
+    }
+
+    // 메인 이동
+    function goMain() {
+        const sessionUserId = /*[[${SS_USER_ID}]]*/ null;
+        location.href = sessionUserId ? "/main/mainLoginSuccess" : "/main/mainPage";
+    }
+
+</script>
+</body>
+</html>

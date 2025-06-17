@@ -1,9 +1,75 @@
 <!DOCTYPE html>
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head>
-  <meta charset="UTF-8">
-  <title>퀴즈 메인</title>
-  <link rel="stylesheet" href="/css/MainStyle.css">
+  <meta charset="UTF-8" />
+  <title>QuizGarten</title>
+  <link rel="icon" href="/assets/logo/logo.png">
+  <link rel="stylesheet" href="/css/MainStyle.css" />
+  <script src="/js/jquery-3.6.0.min.js"></script>
+  <script th:inline="javascript">
+
+    let currentPage = 0;
+    const pageSize = 12;
+    let isLoading = false;
+    let lastPageReached = false;
+
+    $(document).ready(function () {
+      loadPublicQuizzes();
+
+      function loadPublicQuizzes() {
+        if (isLoading || lastPageReached) return;
+
+        isLoading = true;
+
+        $.get(`/quiz/list/main?page=${currentPage}&size=${pageSize}`, function(quizzes) {
+          const container = $('.quiz-container');
+
+          if (quizzes.length === 0) {
+            lastPageReached = true;
+            return;
+          }
+
+          quizzes.forEach(quiz => {
+            const cardHtml = `
+                <div class="quiz-card" onclick="location.href='/quiz/playInfo?quiz=${quiz.quizId}'">
+                    <div class="quiz-thumbnail">
+                        <img src="${quiz.thumbnailUrl || '/assets/thumbnail/sample_thumbnail.jpg'}" alt="퀴즈 썸네일" />
+                    </div>
+                    <div class="quiz-info">
+                        <div class="quiz-title">${quiz.quizTitle}</div>
+                        <div class="quiz-desc">${quiz.description || '설명 없음'}</div>
+                        <div class="quiz-desc">${quiz.quizCategory || '카테고리 없음'}</div>
+                        <img class="icon" src="/assets/icon/${quiz.quizType}_icon.png" alt="아이콘" />
+                        <div class="quiz-date">${quiz.createdAt || ''}</div>
+                    </div>
+                </div>`;
+            container.append(cardHtml);
+          });
+
+          currentPage++;
+          isLoading = false;
+        });
+      }
+      $(window).on("scroll", function () {
+        const scrollTop = $(window).scrollTop();
+        const windowHeight = $(window).height();
+        const documentHeight = $(document).height();
+
+        if (scrollTop + windowHeight + 100 >= documentHeight) {
+          loadPublicQuizzes();
+        }
+      });
+    });
+
+    function goMain() {
+      const sessionUserId = /*[[${SS_USER_ID}]]*/ null;
+      if (sessionUserId === null || sessionUserId === "") {
+        location.href = "/main/mainPage";
+      } else {
+        location.href = "/main/mainLoginSuccess";
+      }
+    }
+  </script>
 </head>
 <body>
 <header>
@@ -15,79 +81,17 @@
 </header>
 
 <main>
-  <div class="quiz-container">
-
-    <!-- 카드 1 -->
-    <div class="quiz-card" onclick="location.href='/quiz/image'">
-      <div class="quiz-thumbnail">
-        <img src="/assets/thumbnail/sample_thumbnail.jpg" alt="퀴즈 썸네일" />
-      </div>
-      <div class="quiz-info">
-        <div class="quiz-title">부분 이미지 퀴즈</div>
-        <div class="quiz-desc">
-          잘린 부분 사진 보고 맞추기<br/>퀴즈 설명 설명 설명어어엉
-        </div>
-        <img class="icon" src="/assets/icon/image_icon.png" alt="아이콘" />
-      </div>
-    </div>
-
-    <!-- 카드 2 -->
-    <div class="quiz-card" onclick="location.href='/quiz/image'">
-      <div class="quiz-thumbnail">
-        <img src="/assets/thumbnail/sample_thumbnail.jpg"  alt="퀴즈 썸네일" />
-      </div>
-      <div class="quiz-info">
-        <div class="quiz-title">전체 이미지 퀴즈</div>
-        <div class="quiz-desc">
-          전체 사진 보고 맞추기<br/>퀴즈 설명 설명 설명어어엉
-        </div>
-        <img class="icon" src="/assets/icon/image_icon.png" alt="아이콘" />
-      </div>
-    </div>
-
-    <!-- 카드 3 -->
-    <div class="quiz-card" onclick="location.href='/quiz/audio'">
-      <div class="quiz-thumbnail">
-        <img src="/assets/thumbnail/sample_thumbnail.jpg"  alt="퀴즈 썸네일" />
-      </div>
-      <div class="quiz-info">
-        <div class="quiz-title">음성 퀴즈</div>
-        <div class="quiz-desc">
-          음악 듣고 맞추기<br/>퀴즈 설명 설명 설명어어엉
-        </div>
-        <img class="icon" src="/assets/icon/audio_icon.png" alt="아이콘" />
-      </div>
-    </div>
-
-    <!-- 카드 4 -->
-    <div class="quiz-card" onclick="location.href='/quiz/multiple'">
-      <div class="quiz-thumbnail">
-        <img src="/assets/thumbnail/sample_thumbnail.jpg"  alt="퀴즈 썸네일" />
-      </div>
-      <div class="quiz-info">
-        <div class="quiz-title">객관식 퀴즈</div>
-        <div class="quiz-desc">
-          객관식 문제 보고 선택지 맞추기<br/>퀴즈 설명 설명 설명어어엉
-        </div>
-        <img class="icon" src="/assets/icon/multi_icon.png" alt="아이콘" />
-      </div>
-    </div>
-
-    <!-- 카드 5 -->
-    <div class="quiz-card" onclick="location.href='/quiz/ai'">
-      <div class="quiz-thumbnail">
-        <img src="/assets/thumbnail/sample_thumbnail.jpg"  alt="퀴즈 썸네일" />
-      </div>
-      <div class="quiz-info">
-        <div class="quiz-title">객관식 퀴즈 (AI)</div>
-        <div class="quiz-desc">
-          AI가 만든 객관식 문제 보고 맞추기<br/>퀴즈 설명 설명 설명어어엉
-        </div>
-        <img class="icon" src="/assets/icon/ai_icon.png" alt="아이콘" />
-      </div>
-    </div>
-
+  <div class="quiz-container" id="publicQuizContainer">
+    <!-- 동적 퀴즈 카드가 이곳에 렌더링됩니다 -->
   </div>
+
+  <div id="customAlert">
+    <div class="alert-box">
+      <div id="alertMessage">알림 메시지</div>
+      <button id="alertOk">확인</button>
+    </div>
+  </div>
+
 </main>
 </body>
 </html>

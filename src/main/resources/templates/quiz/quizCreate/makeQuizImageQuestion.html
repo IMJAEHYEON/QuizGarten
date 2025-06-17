@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>QuizGarten</title>
+    <link rel="icon" href="/assets/logo/logo.png">
+    <link rel="stylesheet" href="/css/MainStyle.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" />
+    <script src="/js/jquery-3.6.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+</head>
+<script th:inline="javascript">
+    let cropper;
+    let croppedBlob;
+    let originalBlob;
+    let answerList = [];
+    let existingImageUrl = null;
+    let existingQuizImageCut = null;
+
+    $(document).ready(function () {
+        // 로그인 검증 추가 시작
+        const sessionUserId = /*[[${SS_USER_ID}]]*/ null;
+        if (sessionUserId === null || sessionUserId === "") {
+            alert("로그인 후 이용할 수 있습니다.");
+            location.href = "/main/mainPage";
+            return;
+        }
+        // preloadQuestionData(q)에서 호출할 QuizId, QuestionId
+        const quizId = window.popupQuizId;
+        const questionId = window.popupQuizDetailId;
+
+
+        console.log("팝업 로드됨, quizId:", quizId, "questionId:", questionId);
+
+        $('#imageInput').on('change', handleImageInput);
+        $('#cropButton').on('click', cropImage);
+
+
+        if (questionId) {
+            fetch(`/quiz/mongo/${quizId}/question/${questionId}`)
+                .then(res => res.json())
+                .then(q => preloadQuestionData(q))
+                .catch(err => console.error("문제 로딩 실패", err));
+        }
+
+    });
+
+
+    function handleImageInput(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        originalBlob = file;
+
+        const reader = new FileReader();
+        reader.onload = function (event) {
+            $('#previewImage').attr('src', event.target.result).show();
+            $('#originalImagePreview').attr('src', event.target.result).show();
+
+            if (cropper) cropper.destroy();
+            cropper = new Cropper(document.getElementById('previewImage'), { viewMode: 1 });
+            $('#cropButton').show();
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function cropImage() {
+        if (!cropper) return showAlert("먼저 이미지를 업로드하세요.");
+        cropper.getCroppedCanvas().toBlob(function (blob) {
+            croppedBlob = blob;
+            const url = URL.createObjectURL(blob);
+            $('#previewImage').attr('src', url).show();
+        });
+    }
+
+    function addAnswer() {
+        const input = $('#answerInput').val().trim();
+        if (!input) return showAlert("정답을 입력해주세요.");
+        if (answerList.length >= 10) return showAlert("최대 10개의 정답만 등록할 수 있습니다.");
+        answerList.push(input);
+        renderAnswers();
+        $('#answerInput').val('');
+    }
+
+    // 기존 데이터 로딩 함수
+    function preloadQuestionData(q) {
+        if (q.quizImageCut) {
+            $('#previewImage').attr('src', q.quizImageCut).show();
+            window.existingQuizImageCut = q.quizImageCut;
+        }
+        if (q.imageUrl) {
+            $('#originalImagePreview').attr('src', q.imageUrl).show();
+            window.existingImageUrl = q.imageUrl;
+        }
+
+        // 정답 처리
+        if (Array.isArray(q.answers)) {
+            answerList = q.answers;
+        } else if (typeof q.answer === "string") {
+            answerList = q.answer.split(',').map(str => str.trim()).filter(Boolean);
+        } else {
+            answerList = []; // fallback
+        }
+
+        renderAnswers();
+    }
+
+
+    function renderAnswers() {
+        const container = $('#answerList').empty();
+        answerList.forEach((answer, idx) => {
+            container.append(`<span>${answer} <button onclick="removeAnswer(${idx})">x</button></span> `);
+        });
+    }
+
+    function removeAnswer(idx) {
+        answerList.splice(idx, 1);
+        renderAnswers();
+    }
+
+    function submitQuizQuestion() {
+        const quizId = window.popupQuizId;
+        const questionId = window.popupQuestionId;
+
+        if (!originalBlob && !window.existingImageUrl) {
+            return showAlert("이미지를 업로드해주세요.");
+        }
+        if (!croppedBlob && !window.existingQuizImageCut) {
+            croppedBlob = originalBlob;
+        }
+
+        if (answerList.length === 0) return showAlert("최소 1개의 정답을 입력해주세요.");
+
+        const formData = new FormData();
+
+        if (originalBlob) {
+            formData.append("originalFile", originalBlob, "original.png");
+        }
+        if (croppedBlob) {
+            formData.append("croppedFile", croppedBlob, "cropped.png");
+        }
+
+        formData.append("answers", JSON.stringify(answerList));
+
+        if (window.popupQuizDetailId) {
+            formData.append("quizDetailId", window.popupQuizDetailId);
+        }
+
+        console.log("formData 전송 직전 answerList:", answerList);
+
+        let method = questionId ? 'PUT' : 'POST';
+        let url = questionId
+            ? `/quiz/mongo/${quizId}/question/${questionId}`
+            : `/quiz/mongo/${quizId}/image-question`;
+
+        if (questionId) {
+            const questionPayload = {
+                questionId,
+                quizImageCut: croppedBlob ? "이미지 URL 서버가 처리" : window.existingQuizImageCut || null,
+                imageUrl: originalBlob ? "이미지 URL 서버가 처리" : window.existingImageUrl || null,
+                answers: answerList, // ← 여기만 필요!
+            };
+            formData.append("question", new Blob([JSON.stringify(questionPayload)], { type: "application/json" }));
+            formData.append("questionId", questionId);
+        }
+
+        fetch(url, {
+            method: method,
+            body: formData
+        })
+            .then(res => {
+                if (!res.ok) throw new Error("문제 저장 실패");
+                return res.text();
+            })
+            .then(() => {
+                showAlert("문제가 성공적으로 저장되었습니다.", () => {
+                    $('#popupContainer').fadeOut();
+                    if (window.parent && typeof window.parent.fetchQuestions === "function") {
+                        window.parent.fetchQuestions();
+                    }
+                });
+            })
+            .catch(err => showAlert(err.message || "문제 저장 중 오류가 발생했습니다."));
+    }
+
+
+    function showAlert(message, callback) {
+        $('#alertMessage').text(message);
+        $('#customAlert').css('display', 'flex');
+        $('#alertOk').off('click').on('click', function () {
+            $('#customAlert').hide();
+            if (typeof callback === 'function') callback();
+        });
+    }
+</script>
+<body>
+<div class="quiz-make-modal">
+    <h2>이미지 퀴즈 만들기</h2>
+
+    <input type="file" id="imageInput" accept="image/*" style="margin-bottom: 10px;">
+
+    <div style="display: flex; justify-content: space-between; gap: 20px;">
+        <!-- 문제 이미지 -->
+        <div style="flex: 1; text-align: center;">
+            <h4>문제 이미지 (자르기 가능)</h4>
+            <div class="image-box" style="position: relative;">
+                <img id="previewImage" style="display: none; max-width: 100%;">
+                <button id="cropButton" style="position: absolute; bottom: 10px; right: 10px; display: none;">잘라내기</button>
+            </div>
+        </div>
+
+        <!-- 정답 이미지 -->
+        <div style="flex: 1; text-align: center;">
+            <h4>정답 이미지 (원본)</h4>
+            <div class="image-box">
+                <img id="originalImagePreview" style="display: none; max-width: 100%;">
+            </div>
+        </div>
+    </div>
+    <!-- 정답 입력 -->
+    <div class="button-group" style="margin-top: 20px;">
+        <input type="text" id="answerInput" placeholder="정답을 입력하세요 (최대 10개)" style="width: 60%;">
+        <button onclick="addAnswer()">추가</button>
+        <div id="answerList" class="answer-list" style="margin-top: 10px;"></div>
+    </div>
+
+    <!-- 저장 버튼 -->
+    <div class="button-group" style="margin-top: 20px;">
+        <button onclick="submitQuizQuestion()">문제 저장</button>
+    </div>
+</div>
+<div id="customAlert" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center;">
+    <div style="background:white; padding:30px; border-radius:10px; text-align:center;">
+        <div id="alertMessage"></div>
+        <button id="alertOk" style="margin-top:10px;">확인</button>
+    </div>
+</div>
+</body>
+</html>

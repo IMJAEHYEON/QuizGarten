@@ -2,7 +2,7 @@ package kopo.poly.dto;
 
 import lombok.Builder;
 
-@Builder
+@Builder(toBuilder = true)
 public record NoticeDTO(
 
         Long noticeSeq, // 기본키, 순번

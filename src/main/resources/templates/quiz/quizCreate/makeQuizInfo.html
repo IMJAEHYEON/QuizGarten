@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>QuizGarten</title>
+    <link rel="icon" href="/assets/logo/logo.png">
+    <link rel="stylesheet" href="/css/MainStyle.css">
+    <script src="/js/jquery-3.6.0.min.js"></script>
+    <script th:inline="javascript">
+        // onload 함수에 추가
+        window.onload = function () {
+            const sessionUserId = /*[[${SS_USER_ID}]]*/ null;
+            if (!sessionUserId) {
+                alert("로그인 후 이용할 수 있습니다.");
+                location.href = "/main/mainPage";
+                return;
+            }
+
+            const quizType = getQuizTypeFromUrl();
+            const categoryInput = document.getElementById('quizCategory');
+            if (quizType === 'ai') {
+                categoryInput.disabled = false;
+                categoryInput.placeholder = '카테고리를 입력하세요';
+            } else {
+                categoryInput.disabled = true;
+                categoryInput.placeholder = 'AI 퀴즈 선택 시만 입력 가능';
+            }
+
+            document.getElementById('thumbnailInput').addEventListener('change', function (event) {
+                const file = event.target.files[0];
+                const previewImage = document.getElementById('thumbnailPreviewImage');
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function (e) {
+                        previewImage.src = e.target.result;
+                        previewImage.style.display = 'block';
+                    };
+                    reader.readAsDataURL(file);
+                } else {
+                    previewImage.style.display = 'none';
+                }
+            });
+        };
+
+
+        function getQuizTypeFromUrl() {
+            const params = new URLSearchParams(window.location.search);
+            return params.get('type');
+        }
+
+        function validateAndProceed() {
+            const titleInput = document.getElementById('quizTitle');
+            const descriptionInput = document.getElementById('quizDescription');
+            const titleError = document.getElementById('titleError');
+            const descriptionError = document.getElementById('descriptionError');
+
+            let isValid = true;
+
+            if (!titleInput.value.trim()) {
+                titleError.style.display = 'block';
+                isValid = false;
+            } else {
+                titleError.style.display = 'none';
+            }
+
+            if (!descriptionInput.value.trim()) {
+                descriptionError.style.display = 'block';
+                isValid = false;
+            } else {
+                descriptionError.style.display = 'none';
+            }
+
+            if (!isValid) return;
+
+            const file = document.getElementById('thumbnailInput').files[0];
+            const selectedQuizType = getQuizTypeFromUrl();
+            const sessionUserId = /*[[${SS_USER_ID}]]*/ null;
+
+            if (file) {
+                const uploadForm = new FormData();
+                uploadForm.append("file", file); // 🔧 S3 업로드용 키는 "file"
+
+                fetch("/s3/SingleUpload", {
+                    method: "POST",
+                    body: uploadForm
+                })
+                    .then(res => res.text())
+                    .then(s3Url => {
+                        submitQuizData(titleInput.value, descriptionInput.value, s3Url);
+                    })
+                    .catch(() => alert("썸네일 업로드 실패"));
+            } else {
+                submitQuizData(titleInput.value, descriptionInput.value, null);
+            }
+        }
+
+        // submitQuizData 함수 안에서 category 값 포함
+        function submitQuizData(title, description, s3Url) {
+            const selectedQuizType = getQuizTypeFromUrl();
+            const sessionUserId = /*[[${SS_USER_ID}]]*/ null;
+            const categoryValue = document.getElementById('quizCategory').value;
+
+            const quizInfo = {
+                quiz: {
+                    quizType: selectedQuizType,
+                    quizTitle: title,
+                    description: description,
+                    visibility: document.getElementById('isPublic').checked ? 'Y' : 'N',
+                    userId: sessionUserId,
+                    quizChgId: sessionUserId,
+                    quizComment: "",
+                    thumbnailUrl: s3Url || "",
+                    quizCategory: selectedQuizType === 'ai' ? categoryValue : nul
+                },
+                details: []
+            };
+
+            const formData = new FormData();
+            formData.append("quizInfo", new Blob([JSON.stringify(quizInfo)], { type: "application/json" }));
+
+            $.ajax({
+                url: '/quiz/quizCreate/saveInfo',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function () {
+                    window.location.href = `/quiz/quizCreate/question?type=${selectedQuizType}`;
+                },
+                error: function () {
+                    alert("퀴즈 정보 저장에 실패했습니다.");
+                }
+            });
+        }
+    </script>
+</head>
+<body>
+<div class="modal-backdrop">
+    <div class="quiz-info-modal">
+        <h2>퀴즈 만들기</h2>
+
+        <div>
+            <label for="quizTitle">제목</label>
+            <input type="text" id="quizTitle" placeholder="제목을 입력하세요. (최대 50자)">
+            <div class="error-message" id="titleError" style="display: none;">값을 입력하세요</div>
+        </div>
+
+        <div>
+            <label for="quizDescription">설명</label>
+            <textarea id="quizDescription" placeholder="설명을 입력하세요. (최대 100자)"></textarea>
+            <div class="error-message" id="descriptionError" style="display: none;">값을 입력하세요</div>
+        </div>
+
+        <!-- HTML 추가 -->
+        <div>
+            <label for="quizCategory">카테고리 (AI 제작 시 자동 설정)</label>
+            <input type="text" id="quizCategory" placeholder="AI 퀴즈 선택 시만 입력 가능" disabled>
+        </div>
+
+
+        <div>
+            <label>썸네일 (선택)</label>
+            <input type="file" id="thumbnailInput" accept="image/*">
+            <div class="thumbnail-preview">
+                <img id="thumbnailPreviewImage" style="display: none;" alt="썸네일 미리보기">
+            </div>
+        </div>
+
+        <div>
+            <label>공개 여부</label>
+            <input type="checkbox" id="isPublic">
+        </div>
+
+        <button onclick="validateAndProceed()">확인</button>
+    </div>
+</div>
+</body>
+</html>

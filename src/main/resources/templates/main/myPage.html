@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8" />
+    <title>QuizGarten</title>
+    <link rel="icon" href="/assets/logo/logo.png">
+    <link rel="stylesheet" href="/css/MainStyle.css" />
+    <script src="/js/jquery-3.6.0.min.js"></script>
+    <script th:inline="javascript">
+
+        let currentPage = 0;
+        const pageSize = 12;
+        let isLoading = false;
+        let lastPageReached = false;
+
+        $(document).ready(function() {
+            checkLoginStatus();
+            loadUserQuizzes();
+
+            $("#btnLogout").on("click", function () {
+                $.post("/user/logout", function (res) {
+                    showAlert(res.msg, function () {
+                        location.href = "/main/mainPage";
+                    });
+                });
+            });
+
+            $("#btnDeleteUser").on("click", function () {
+                showPrompt("탈퇴를 원하시면 비밀번호를 입력해주세요:", function(password) {
+                    if (!password) {
+                        showAlert("비밀번호를 입력하셔야 탈퇴가 가능합니다.");
+                        return;
+                    }
+
+                    $.ajax({
+                        url: "/user/deleteUserSecure",
+                        type: "post",
+                        data: { password: password },
+                        dataType: "JSON",
+                        success: function (json) {
+                            showAlert(json.msg, function () {
+                                if (json.result === 1) {
+                                    location.href = "/main/mainPage";
+                                }
+                            });
+                        },
+                        error: function () {
+                            showAlert("회원 탈퇴 중 오류가 발생했습니다.");
+                        }
+                    });
+                });
+            });
+
+            $("#btnChangePassword").on("click", function () {
+                $.ajax({
+                    url: "/user/changePasswordCheck",
+                    type: "get",
+                    dataType: "json",
+                    success: function (res) {
+                        if (res.result === 1) {
+                            location.href = "/user/changePassword";
+                        } else {
+                            showAlert(res.msg);
+                        }
+                    },
+                    error: function () {
+                        showAlert("세션 확인 중 오류가 발생했습니다.");
+                    }
+                });
+            });
+
+            function checkLoginStatus() {
+                $.get('/user/sessionCheck', function(res) {
+                    if (res.result !== 1) {
+                        alert('로그인 후 이용 가능합니다.');
+                        location.href = '/user/login';
+                    }
+                });
+            }
+
+            function loadUserQuizzes() {
+                if (isLoading || lastPageReached) return;
+
+                const userId = /*[[${SS_USER_ID}]]*/ null;
+                if (!userId) {
+                    showAlert("세션이 만료되었습니다. 다시 로그인해주세요.");
+                    location.href = "/user/login";
+                    return;
+                }
+
+                isLoading = true;
+
+                $.get(`/quiz/list/mypage?userId=${userId}&page=${currentPage}&size=${pageSize}`, function(quizzes) {
+                    const container = $('#quizContainer');
+
+                    if (quizzes.length === 0) {
+                        lastPageReached = true;
+                        return;
+                    }
+
+                    quizzes.forEach(quiz => {
+                        const cardHtml = `
+            <div class="quiz-card" onclick="location.href='/quiz/edit?quiz=${quiz.quizId}'">
+                <div class="quiz-thumbnail">
+                    <img src="${quiz.thumbnailUrl || '/assets/thumbnail/sample_thumbnail.jpg'}" alt="퀴즈 썸네일" />
+                </div>
+                <div class="quiz-info">
+                    <div class="quiz-title">${quiz.quizTitle}</div>
+                    <div class="quiz-desc">${quiz.description || '설명 없음'}</div>
+                    <div class="quiz-desc">${quiz.quizCategory || '설명 없음'}</div>
+                    <img class="icon" src="/assets/icon/${quiz.quizType}_icon.png" alt="${quiz.quizType}" />
+                    <div class="quiz-date">${quiz.createdAt || ''}</div>
+                </div>
+            </div>`;
+                        container.append(cardHtml);
+                    });
+
+                    currentPage++;
+                    isLoading = false;
+                });
+
+                $(window).on("scroll", function () {
+                    const scrollTop = $(window).scrollTop();
+                    const windowHeight = $(window).height();
+                    const documentHeight = $(document).height();
+
+                    if (scrollTop + windowHeight + 100 >= documentHeight) {
+                        loadUserQuizzes();
+                    }
+                });
+
+            }
+
+            function showAlert(message, callback) {
+                $("#alertMessage").html(message);
+                $("#customAlert").css("display", "flex").hide().fadeIn(200, function () {
+                    $(this).addClass("show");
+                });
+
+                $("#alertOk").off("click").on("click", function () {
+                    $("#customAlert").removeClass("show").fadeOut(150);
+                    if (typeof callback === "function") callback();
+                });
+            }
+        });
+
+        // 입력 팝업 함수
+        function showPrompt(message, callback) {
+            $("#promptMessage").text(message);
+            $("#promptInput").val("");
+            $("#customPrompt").css("display", "flex").hide().fadeIn(200, function () {
+                $(this).addClass("show");
+            });
+
+            $("#promptOk").off("click").on("click", function () {
+                const value = $("#promptInput").val();
+                $("#customPrompt").removeClass("show").fadeOut(150);
+                if (typeof callback === "function") callback(value);
+            });
+
+            $("#promptCancel").off("click").on("click", function () {
+                $("#customPrompt").removeClass("show").fadeOut(150);
+            });
+        }
+
+        function goMain() {
+            const sessionUserId = /*[[${SS_USER_ID}]]*/ null;
+            if (sessionUserId === null || sessionUserId === "") {
+                location.href = "/main/mainPage";
+            } else {
+                location.href = "/main/mainLoginSuccess";
+            }
+        }
+    </script>
+</head>
+<body>
+<header>
+    <img class="logo" src="/assets/logo/logo.png" alt="로고" onclick="goMain()" style="cursor:pointer;" />
+    <div class="menu-buttons">
+        <button onclick="location.href='/notice/quizNoticeList'">공지사항</button>
+        <button id="btnLogout">로그아웃</button>
+        <button id="btnDeleteUser">회원탈퇴</button>
+        <button id="btnChangePassword">비밀번호 변경</button>
+        <button onclick="location.href='/quiz/makeQuizEdit'">퀴즈만들기</button>
+    </div>
+</header>
+
+<main>
+    <div class="quiz-container" id="quizContainer">
+        <!-- 유저 퀴즈 카드 동적 로딩 -->
+    </div>
+
+    <div id="customAlert">
+        <div class="alert-box">
+            <div id="alertMessage">알림 메시지</div>
+            <button id="alertOk">확인</button>
+        </div>
+    </div>
+
+    <!-- 커스텀 입력 팝업 -->
+    <div id="customPrompt">
+        <div class="prompt-box">
+            <p id="promptMessage">입력 메시지</p>
+            <input type="password" id="promptInput" />
+            <div>
+                <button id="promptOk">확인</button>
+                <button id="promptCancel">취소</button>
+            </div>
+        </div>
+    </div>
+</main>
+</body>
+</html>

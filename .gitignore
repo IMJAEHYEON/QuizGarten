@@ -35,3 +35,7 @@ out/
 
 ### VS Code ###
 .vscode/
+
+# 민감 정보 예외 처리
+src/main/resources/application.properties
+

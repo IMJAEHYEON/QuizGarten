@@ -11,8 +11,8 @@ import org.hibernate.annotations.DynamicUpdate;
 @Table(name = "NOTICE")
 @DynamicInsert
 @DynamicUpdate
-@Builder
 @Entity
+@Builder(toBuilder = true)
 @ToString
 @Cacheable
 public class NoticeEntity {

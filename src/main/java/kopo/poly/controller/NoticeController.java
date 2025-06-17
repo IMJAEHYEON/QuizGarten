@@ -29,7 +29,7 @@ import java.util.Optional;
 @Controller
 public class NoticeController {
 
-    // @RequiredArgsConstructor 를 통해 메모리에 올라간 서비스 객체를 Controller에서 사용할 수 있게 주입함
+
     private final INoticeService noticeService;
 
     /**

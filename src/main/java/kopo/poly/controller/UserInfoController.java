@@ -410,4 +410,15 @@ public class UserInfoController {
         log.info("changePassword End!");
         return MsgDTO.builder().result(res).msg(msg).build();
     }
+
+    @GetMapping("/sessionCheck")
+    @ResponseBody
+    public MsgDTO sessionCheck(HttpSession session) {
+        String userId = (String) session.getAttribute("SS_USER_ID");
+        if (userId != null && !userId.isEmpty()) {
+            return MsgDTO.builder().result(1).msg("로그인 상태입니다.").build();
+        } else {
+            return MsgDTO.builder().result(0).msg("로그인 필요.").build();
+        }
+    }
 }

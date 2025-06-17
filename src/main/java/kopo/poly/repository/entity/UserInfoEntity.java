@@ -13,7 +13,7 @@ import java.io.Serializable;
 @Table(name = "USER_INFO")
 @DynamicInsert
 @DynamicUpdate
-@Builder
+@Builder(toBuilder = true)
 @Cacheable
 @Entity
 public class UserInfoEntity implements Serializable {

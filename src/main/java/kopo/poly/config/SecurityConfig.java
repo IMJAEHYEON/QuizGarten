@@ -30,9 +30,11 @@ public class SecurityConfig {
                                 "/mypage/**", // mypage 하위 전체 허용
                                 "/assets/**", // assets 하위 전체 허용
                                 "/css/**", // css 하위 전체 허용
-                                "/js/**" // js 하위 전체 허용
+                                "/js/**", // js 하위 전체 허용
+                                "/quiz/**",
+                                "/mongo/**"
                         ).permitAll()
-                        .anyRequest().authenticated() // 그 외 요청은 인증 필요
+                        .anyRequest().permitAll() // 그 외 요청은 인증 필요 .authenticated() .permitAll()
                 )
                 .formLogin(form -> form
                         .loginPage("/user/login")

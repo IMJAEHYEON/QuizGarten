@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8" />
+  <title>QuizGarten</title>
+  <link rel="icon" href="/assets/logo/logo.png">
+  <link rel="stylesheet" href="/css/MainStyle.css" />
+  <link rel="stylesheet" href="/css/QuizPlayStyle.css" />
+  <script src="/js/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+<header>
+  <img class="logo" src="/assets/logo/logo.png" alt="로고" onclick="goMain()" style="cursor:pointer;" />
+</header>
+
+<main class="play-container">
+  <div class="play-thumbnail-wrapper">
+    <img id="quizThumbnail" class="play-thumbnail" src="/assets/thumbnail/sample_thumbnail.jpg" alt="퀴즈 썸네일">
+  </div>
+
+  <div class="play-meta-box">
+    <div id="quizTitle" class="play-title">퀴즈 제목</div>
+    <div id="quizDescription" class="play-description">퀴즈 설명</div>
+  </div>
+
+  <div class="play-button-group" id="quizPlayButtons">
+    <!-- 버튼 동적 렌더링 -->
+  </div>
+</main>
+
+<script th:inline="javascript">
+  const quizId = new URLSearchParams(window.location.search).get("quiz");
+
+  $(document).ready(function () {
+    if (!quizId) {
+      alert("퀴즈 ID가 없습니다.");
+      return;
+    }
+
+    // MariaDB 퀴즈 정보
+    fetch(`/quiz/info/${quizId}`)
+            .then(res => res.json())
+            .then(data => {
+              $("#quizTitle").text(data.quizTitle || "제목 없음");
+              $("#quizDescription").text(data.description || "설명 없음");
+              $("#quizThumbnail").attr("src", data.thumbnailUrl || "/assets/default-thumbnail.png");
+            });
+
+    // MongoDB 퀴즈 문제 수
+    fetch(`/quiz/mongo/${quizId}/questions/count`)
+            .then(res => res.json())
+            .then(count => {
+              const container = $("#quizPlayButtons");
+              container.empty();
+
+              if (count < 10) {
+                container.append(`<button onclick="startQuiz(${count})">퀴즈 시작</button>`);
+            } else {
+                [10, 20, 30, 50].forEach(n => {
+                  if (count >= n) {
+                    container.append(`<button onclick="startQuiz(${n})">${n}개 풀기</button>`);
+                  }
+                });
+              }
+            });
+
+    // 메인 이동 함수
+    window.goMain = function () {
+      const userId = /*[[${SS_USER_ID}]]*/ null;
+      location.href = userId ? "/main/mainLoginSuccess" : "/main/mainPage";
+    };
+  });
+
+  function startQuiz(count) {
+    // 퀴즈 시작 전 localStorage 초기화
+    localStorage.removeItem(`solvedQuizDetails_${quizId}`);
+    localStorage.removeItem(`quizResults_${quizId}`);
+
+    location.href = `/quiz/playPage?quiz=${quizId}&count=${count}`;
+  }
+
+</script>
+</body>
+</html>

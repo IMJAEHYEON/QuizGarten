@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8" />
+    <title>QuizGarten</title>
+    <link rel="icon" href="/assets/logo/logo.png">
+    <link rel="stylesheet" href="/css/MainStyle.css" />
+    <link rel="stylesheet" href="/css/QuizPlayStyle.css" />
+    <script src="/js/jquery-3.6.0.min.js"></script>
+    <script src="https://www.youtube.com/iframe_api"></script> <!-- YouTube API -->
+</head>
+<body>
+<header>
+    <img class="logo" src="/assets/logo/logo.png" onclick="goMain()" style="cursor:pointer;" />
+</header>
+
+<main>
+    <div class="quiz-play-container">
+        <div id="quizContent" class="quiz-box">
+            <!-- 문제 내용이 동적으로 렌더링됩니다 -->
+        </div>
+    </div>
+</main>
+
+<script th:inline="javascript">
+    const quizId = new URLSearchParams(location.search).get("quiz");
+    const count = parseInt(new URLSearchParams(location.search).get("count"), 10);
+    let quizType = "";
+    let questions = [];
+    let currentIndex = 0;
+    let ytPlayer = null;
+    let isPlaying = false;
+    let audioStartTime = 0;
+    let audioEndTime = 0;
+
+    $(document).ready(function () {
+
+
+        localStorage.setItem("lastPlayedQuizId", quizId);
+
+        Promise.all([
+            fetch(`/quiz/info/${quizId}`).then(res => res.json()),
+            fetch(`/quiz/mongo/${quizId}/random?count=${count}`).then(res => res.json()) // 선택한 문제 수 반영
+        ]).then(([quizInfo, quizData]) => {
+            quizType = quizInfo.quizType.toLowerCase();
+
+            console.log(questions.length)
+
+            // 푼 문제 필터링
+            const solvedKey = `solvedQuizDetails_${quizId}`;
+            const solvedList = JSON.parse(localStorage.getItem(solvedKey) || "[]");
+
+            questions = quizData
+                .filter(q => !solvedList.includes(q.quizDetailId));
+
+            if (questions.length > count) {
+                questions = questions.slice(0, count);
+            }
+
+
+            if (questions.length === 0) {
+                location.href = "/quiz/complete"; // 모든 문제 풀었으면 종료 페이지로 이동
+                return;
+            }
+
+            currentIndex = 0;
+            showQuiz();
+        });
+    });
+
+
+
+    function showQuiz() {
+        const solvedKey = `solvedQuizDetails_${quizId}`;
+        const solvedList = JSON.parse(localStorage.getItem(solvedKey) || "[]");
+
+        if (solvedList.length >= count) {
+            location.href = "/quiz/complete";
+            return;
+        }
+
+        const current = questions[currentIndex];
+        const container = $("#quizContent");
+        container.empty();
+
+        switch (quizType) {
+            case "image":
+                renderImageQuiz(current);
+                break;
+            case "audio":
+                renderAudioQuiz(current);
+                break;
+            case "multiple":
+            case "ai":
+                renderMultipleChoiceQuiz(current);
+                break;
+            default:
+                console.warn("알 수 없는 퀴즈 타입입니다:", quizType, current);
+        }
+    }
+
+    function renderImageQuiz(q) {
+        $("#quizContent").html(`
+        <img src="${q.quizImageCut}" class="quiz-preview-img" />
+        <input type="text" id="answerInput" placeholder="정답을 입력해주세요" />
+        <button onclick="submitAnswer()">→</button>
+        `);
+    }
+
+
+    function renderAudioQuiz(q) {
+        const questionId = q.quizDetailId;
+
+        fetch(`/quiz/mongo/${quizId}/question/${questionId}/youtube-id`)
+            .then(res => res.text())
+            .then(videoId => {
+                audioStartTime = Math.floor(Number(q.audioStartTime));
+                audioEndTime = Math.floor(Number(q.audioEndTime));
+
+                // 렌더링
+                $("#quizContent").html(`
+                <div class="audio-quiz-wrapper">
+                    <div id="audioPlayerOverlay" class="dark-audio-cover" onclick="togglePlayback()">
+                        <div class="custom-play-button">▶</div>
+                        <div class="custom-play-button" id="playPauseBtn">▶</div>
+                    </div>
+                    <div id="youtube-player" style="display: none;"></div>
+                </div>
+                <input type="text" id="answerInput" placeholder="정답을 입력해주세요" />
+                <button onclick="submitAnswer()">→</button>
+            `);
+
+                window.onYouTubeIframeAPIReady = function () {
+                    ytPlayer = new YT.Player("youtube-player", {
+                        videoId: videoId,
+                        events: {
+                            onReady: function (event) {
+                                ytPlayer.setVolume(35); // 퀴즈 볼륨
+                                ytPlayer.seekTo(audioStartTime);
+                                ytPlayer.playVideo(); // 자동 재생
+                                isPlaying = true; // 상태 갱신
+                                $("#playPauseBtn").text("❚❚");
+                            },
+                            onStateChange: function (e) {
+                                if (e.data === YT.PlayerState.ENDED) {
+                                    isPlaying = false;
+                                    $("#playPauseBtn").text("▶");
+                                }
+                            }
+                        },
+                        playerVars: {
+                            start: audioStartTime,
+                            end: audioEndTime,
+                            controls: 0,
+                            autoplay: 0,
+                            modestbranding: 1,
+                            rel: 0
+                        }
+                    });
+                };
+
+                // 수동 초기화 (APIReady 콜백이 여러 번 실행되지 않도록 보장)
+                if (typeof YT !== "undefined" && YT.Player) {
+                    window.onYouTubeIframeAPIReady();
+                }
+            });
+    }
+
+    function togglePlayback() {
+        if (!ytPlayer || !ytPlayer.playVideo) return;
+
+        const btn = $("#playPauseBtn");
+
+        if (isPlaying) {
+            ytPlayer.pauseVideo();
+            btn.text("▶");
+            isPlaying = false;
+        } else {
+            const currentTime = ytPlayer.getCurrentTime();
+
+            // 현재 시간이 endTime 이상이면 다시 처음으로 돌아가서 재생
+            if (currentTime >= audioEndTime || currentTime < audioStartTime) {
+                ytPlayer.seekTo(audioStartTime);
+            }
+
+            ytPlayer.playVideo();
+            btn.text("❚❚");
+            isPlaying = true;
+        }
+    }
+
+    function renderMultipleChoiceQuiz(q) {
+        const choicesHtml = q.choices.map(choice =>
+            `<button class="quiz-choice" onclick="submitChoice('${choice}')">
+                ${choice} <span class="arrow">→</span>
+            </button>`
+        ).join("");
+        $("#quizContent").html(`
+        <div class="question-text">${q.questionText}</div>
+        <div class="choice-list">${choicesHtml}</div>
+        `);
+    }
+
+    function submitAnswer() {
+        const userAnswer = $("#answerInput").val().trim();
+        const quizDetail = questions[currentIndex];
+        const quizDetailId = quizDetail.quizDetailId;
+
+        localStorage.setItem("currentQuizDetail", JSON.stringify(quizDetail));
+        localStorage.setItem("nextQuizUrl", `/quiz/playPage?quiz=${quizId}&count=${count}`);
+
+        markAsSolved(quizDetailId);
+
+        location.href = `/quiz/playCorrect?quiz=${quizId}&quizDetailId=${quizDetailId}&userAnswer=${encodeURIComponent(userAnswer)}&type=${quizType}`;
+    }
+
+
+    function submitChoice(choice) {
+        const quizDetail = questions[currentIndex];
+        const quizDetailId = quizDetail.quizDetailId;
+
+        localStorage.setItem("currentQuizDetail", JSON.stringify(quizDetail));
+        localStorage.setItem("nextQuizUrl", `/quiz/playPage?quiz=${quizId}&count=${count}`);
+
+        markAsSolved(quizDetailId);
+
+        location.href = `/quiz/playCorrect?quiz=${quizId}&quizDetailId=${quizDetailId}&userAnswer=${encodeURIComponent(choice)}&type=${quizType}`;
+    }
+
+    function markAsSolved(detailId) {
+        const solvedKey = `solvedQuizDetails_${quizId}`;
+        const solvedList = JSON.parse(localStorage.getItem(solvedKey) || "[]");
+        if (!solvedList.includes(detailId)) {
+            solvedList.push(detailId);
+            localStorage.setItem(solvedKey, JSON.stringify(solvedList));
+        }
+    }
+
+    function goMain() {
+        const userId = /*[[${SS_USER_ID}]]*/ null;
+        location.href = userId ? "/main/mainLoginSuccess" : "/main/mainPage";
+    }
+</script>
+</body>
+</html>

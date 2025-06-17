@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>QuizGarten</title>
+    <link rel="icon" href="/assets/logo/logo.png">
+    <link rel="stylesheet" href="/css/MainStyle.css">
+    <script src="/js/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+<div class="quiz-make-modal">
+    <h2>AI 자동생성 객관식 퀴즈 만들기</h2>
+
+    <label>문제 내용</label>
+    <textarea id="questionText" placeholder="문제를 입력하세요" style="width: 100%; height: 80px; margin-bottom: 15px;"></textarea>
+
+    <label>선택지</label>
+    <div id="choicesContainer">
+        <div><input type="text" class="choice" placeholder="선택지 1" style="width: 80%;" /> <input type="radio" name="correct" value="0" /> 정답</div>
+        <div><input type="text" class="choice" placeholder="선택지 2" style="width: 80%;" /> <input type="radio" name="correct" value="1" /> 정답</div>
+        <div><input type="text" class="choice" placeholder="선택지 3" style="width: 80%;" /> <input type="radio" name="correct" value="2" /> 정답</div>
+        <div><input type="text" class="choice" placeholder="선택지 4" style="width: 80%;" /> <input type="radio" name="correct" value="3" /> 정답</div>
+    </div>
+
+    <div class="button-group" style="margin-top: 20px;">
+        <button onclick="submitMultipleChoiceQuestion()">문제 저장</button>
+        <button id="generateAiBtn" class="main-button" style="margin-left: 10px;">AI 자동 생성</button>
+    </div>
+</div>
+
+<!-- 커스텀 알림 -->
+<div id="customAlert" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center;">
+    <div style="background:white; padding:30px; border-radius:10px; text-align:center;">
+        <div id="alertMessage"></div>
+        <button id="alertOk" style="margin-top:10px;">확인</button>
+    </div>
+</div>
+
+<script th:inline="javascript">
+    let isGenerating = false;
+
+    $(document).ready(function () {
+
+        const quizId = window.popupQuizId;
+        const quizDetailId = window.popupQuizDetailId;
+        const quizCategory = window.quizCategory || "일반"; // 기본값: 일반
+
+        if (quizId && quizDetailId) {
+            fetch(`/quiz/mongo/${quizId}/question/${quizDetailId}`)
+                .then(res => res.json())
+                .then(data => preloadQuestionData(data))
+                .catch(err => console.error("객관식 문제 불러오기 실패", err));
+        }
+
+        $('#alertOk').on('click', () => $('#customAlert').hide());
+
+        // AI 자동 생성 버튼 클릭
+        $('#generateAiBtn').on('click', function () {
+
+            if (isGenerating) return;
+            isGenerating = true;
+
+            const btn = $(this);
+            btn.prop('disabled', true).text("AI 생성 중...");
+
+            const prompt = $('#questionText').val().trim(); // 입력값이 있으면 전달
+
+            const dto = {
+                quizId: quizId,
+                category: quizCategory,
+                prompt: prompt
+            };
+
+            $.ajax({
+                url: "/quiz/generate-ai",
+                method: "POST",
+                contentType: "application/json",
+                data: JSON.stringify(dto),
+                success: function () {
+                    showAlert("AI 퀴즈가 생성되었습니다.", () => {
+                        window.location.href = `/quiz/makeQuizEdit?quiz=${quizId}`;
+                    });
+                },
+                error: function () {
+                    showAlert("AI 퀴즈 생성에 실패했습니다.");
+                },
+                complete: function () {
+                    // 요청 성공/실패 상관없이 다시 활성화
+                    isGenerating = false;
+                    btn.prop('disabled', false).text("AI 자동 생성");
+                }
+            });
+        });
+    });
+
+    function preloadQuestionData(data) {
+        $('#questionText').val(data.questionText || '');
+        const choices = data.choices || [];
+        const answers = Array.isArray(data.answers) ? data.answers : [data.answer];
+
+        $('.choice').each(function (i) {
+            $(this).val(choices[i] || '');
+            if (answers.includes(choices[i])) {
+                $(`input[name="correct"][value="${i}"]`).prop('checked', true);
+            }
+        });
+    }
+
+    function submitMultipleChoiceQuestion() {
+        const questionText = $('#questionText').val().trim();
+        const choices = $('.choice').map((_, el) => $(el).val().trim()).get();
+        const selectedIndex = $('input[name="correct"]:checked').val();
+
+        if (!questionText) return showAlert("문제 내용을 입력하세요.");
+        if (choices.some(c => !c)) return showAlert("모든 선택지를 입력하세요.");
+        if (selectedIndex === undefined) return showAlert("정답을 선택하세요.");
+
+        const dto = {
+            quizId: window.popupQuizId,
+            quizDetailId: window.popupQuizDetailId,
+            questionText: questionText,
+            choices: choices,
+            answers: [choices[selectedIndex]],
+            quizCategory: window.quizCategory
+        };
+
+        $.ajax({
+            url: `/quiz/mongo/${dto.quizId}/multiple-question`,
+            method: "POST",
+            contentType: "application/json",
+            data: JSON.stringify(dto),
+            success: function () {
+                showAlert("객관식 문제가 저장되었습니다.", () => {
+                    window.location.reload();
+                });
+            },
+            error: function () {
+                showAlert("문제 저장에 실패했습니다.");
+            }
+        });
+    }
+
+    function showAlert(msg, callback) {
+        const $alert = $('#customAlert');
+        const $ok = $('#alertOk');
+
+        $('#alertMessage').text(msg);
+        $alert.css('display', 'flex');
+
+        // 기존 이벤트 제거 후 새 이벤트 등록
+        $ok.off('click').on('click', function handleClickOnce() {
+            $alert.hide();
+            $ok.off('click'); // 추가 클릭 방지
+
+            if (typeof callback === 'function') {
+                callback();
+            }
+        });
+    }
+</script>
+</body>
+</html>
